@@ -3,7 +3,7 @@
     {
       "id": 1,
       "name": "Main telemetry",
-      "enabledByDefault": true,
+      "enabledByDefault": false,
       "variables": [
         {
           "varId": 16,

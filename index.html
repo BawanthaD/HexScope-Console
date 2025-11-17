@@ -136,7 +136,7 @@
       <button id="disconnectBtn" disabled>Disconnect</button>
     </div>
     <div class="small">
-      Works in Chrome / Edge using Web Serial. Click “Connect” to choose a COM port.
+      Use Chrome / Edge with Web Serial. Serve this as http://localhost/... (not file://).
     </div>
   </div>
 
@@ -160,10 +160,11 @@
         </div>
         <div class="row">
           <button id="notifyStartBtn" disabled>Start notify</button>
-          <button id="notifyStopBtn" disabled>Stop notify</button>
+          <button id="notifyStopBtn" disabled>Stop notify (selected)</button>
         </div>
         <div class="small">
-          Notify: ESP32 sends the selected variable value every 1s until “Stop notify”.
+          Click <b>Start notify</b> for each variable you want to stream.<br>
+          <b>Stop notify</b> sends NOTIFY_STOP for the currently selected variable.
         </div>
       </div>
 
@@ -175,7 +176,7 @@
         </div>
         <canvas id="dataChart" height="200"></canvas>
         <div class="small">
-          Multiple variables can be plotted at once. Data is added on each READ/NOTIFY.
+          Each variable is its own trace (x = time, y = value). Checkboxes show/hide traces.
         </div>
       </div>
 
@@ -278,13 +279,6 @@
       return buildFrame(CMD_NOTIFY_STOP, [varId]);
     }
 
-    function toggleNotify(varId, enable) {
-        const frame = enable ? buildNotifyStartFrame(varId)
-                            : buildNotifyStopFrame(varId);
-        sendFrame(frame);
-    }
-
-
     /************************************************************
      *  Parsing RX frames
      ************************************************************/
@@ -358,7 +352,7 @@
           raw: rawFrame
         });
 
-        // Feed the graph
+        // Feed the graph for every sample
         addChartPoint(varId, value);
       } else {
         addDecodedItem({
@@ -408,7 +402,7 @@
 
         const cb = document.createElement('input');
         cb.type = 'checkbox';
-        cb.checked = (idx === 0); // first one on by default
+        cb.checked = (idx === 0); // show first by default
         cb.dataset.varId = v.id;
 
         cb.addEventListener('change', () => {
@@ -620,12 +614,14 @@
     notifyStopBtn.addEventListener('click', onNotifyStop);
 
     /************************************************************
-     *  Chart handling – multiple datasets
+     *  Chart handling – multiple datasets, scatter-style
      ************************************************************/
     const chartCtx = document.getElementById('dataChart').getContext('2d');
-    const MAX_POINTS = 100;
+    const MAX_POINTS = 300;
 
-    // Create one dataset per variable
+    const t0 = performance.now(); // reference time
+
+    // One dataset per variable, using {x,y} points
     const datasets = VARIABLE_DB.map((v, idx) => ({
       label: v.name,
       data: [],
@@ -633,13 +629,13 @@
       tension: 0.1,
       pointRadius: 0,
       varId: v.id,
-      hidden: idx !== 0 // show only first by default
+      hidden: idx !== 0,  // show first by default
+      parsing: false      // we provide {x,y}
     }));
 
     const dataChart = new Chart(chartCtx, {
       type: 'line',
       data: {
-        labels: [],
         datasets: datasets
       },
       options: {
@@ -647,8 +643,8 @@
         responsive: true,
         scales: {
           x: {
-            title: { display: true, text: 'Time' },
-            ticks: { autoSkip: true, maxTicksLimit: 10 }
+            type: 'linear',
+            title: { display: true, text: 'Time (s)' }
           },
           y: {
             title: { display: true, text: 'Value' }
@@ -668,30 +664,18 @@
     }
 
     function addChartPoint(varId, value) {
-      // Time label for this sample
-      const now = new Date();
-      const label = now.toLocaleTimeString();
+      const tNow = (performance.now() - t0) / 1000.0; // seconds since page load
 
-      const labels = dataChart.data.labels;
+      const ds = dataChart.data.datasets.find(d => d.varId === varId);
+      if (!ds) return;
 
-      labels.push(label);
+      ds.data.push({ x: tNow, y: value });
 
-      // For each dataset, push the value or null
-      dataChart.data.datasets.forEach(ds => {
-        if (ds.varId === varId) {
-          ds.data.push(value);
-        } else {
-          ds.data.push(null); // keep arrays aligned
-        }
-      });
-
-      // Trim history
-      if (labels.length > MAX_POINTS) {
-        labels.shift();
-        dataChart.data.datasets.forEach(ds => ds.data.shift());
+      if (ds.data.length > MAX_POINTS) {
+        ds.data.shift();
       }
 
-      dataChart.update('none'); // no animation for snappy updates
+      dataChart.update('none'); // no animation → smooth streaming
     }
   </script>
 </body>

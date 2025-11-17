@@ -1,0 +1,23 @@
+[
+  {
+    "id": 16,
+    "name": "Temperature",
+    "unit": "°C",
+    "type": "int16",
+    "description": "Board temperature"
+  },
+  {
+    "id": 17,
+    "name": "Pressure",
+    "unit": "kPa",
+    "type": "int16",
+    "description": "Line pressure"
+  },
+  {
+    "id": 18,
+    "name": "Flow Rate",
+    "unit": "L/min",
+    "type": "int16",
+    "description": "Flow through sensor 1"
+  }
+]

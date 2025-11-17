@@ -1,0 +1,24 @@
+{
+  "notifyCases": [
+    {
+      "id": 1,
+      "name": "Main telemetry",
+      "enabledByDefault": true,
+      "variables": [
+        {
+          "varId": 16,
+          "nameOverride": "Bus Voltage",
+          "formula": "B1 + B2 * 255 - 50"
+        },
+        {
+          "varId": 17,
+          "formula": "B2 + B3 * 256"
+        },
+        {
+          "varId": 18,
+          "formula": "B4"
+        }
+      ]
+    }
+  ]
+}

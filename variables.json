@@ -1,23 +1,26 @@
 [
   {
     "id": 16,
-    "name": "Temperature",
-    "unit": "°C",
-    "type": "int16",
-    "description": "Board temperature"
+    "name": "Voltage",
+    "unit": "V",
+    "format": "int16",
+    "signed": false,
+    "scale": 0.1
   },
   {
     "id": 17,
-    "name": "Pressure",
-    "unit": "kPa",
-    "type": "int16",
-    "description": "Line pressure"
+    "name": "Current",
+    "unit": "A",
+    "format": "int16",
+    "signed": true,
+    "scale": 0.01
   },
   {
     "id": 18,
-    "name": "Flow Rate",
-    "unit": "L/min",
-    "type": "int16",
-    "description": "Flow through sensor 1"
+    "name": "Temperature",
+    "unit": "°C",
+    "format": "int16",
+    "signed": true,
+    "scale": 1.0
   }
 ]

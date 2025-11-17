@@ -9,7 +9,6 @@
       --bg-surface: #0f172a;
       --border-subtle: rgba(148, 163, 184, 0.16);
       --accent: #3b82f6;
-      --accent-soft: rgba(59, 130, 246, 0.1);
       --danger: #ef4444;
       --text-primary: #e5e7eb;
       --text-muted: #94a3b8;
@@ -29,18 +28,24 @@
       color: var(--text-primary);
     }
 
-    /* Header --------------------------------------------- */
+    /* TOP BAR -------------------------------------------------- */
     .topbar {
       position: sticky;
       top: 0;
       z-index: 10;
       backdrop-filter: blur(12px);
-      background: rgba(15, 23, 42, 0.88);
+      background: rgba(15, 23, 42, 0.94);
       border-bottom: 1px solid var(--border-subtle);
       padding: 12px 24px;
       display: flex;
       align-items: center;
       justify-content: space-between;
+    }
+
+    .topbar-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
     }
 
     .app-logo {
@@ -49,12 +54,6 @@
       border-radius: 8px;
       background: radial-gradient(circle at 30% 20%, #38bdf8, #1d4ed8 60%, #020617 90%);
       box-shadow: 0 0 18px rgba(59, 130, 246, 0.7);
-      margin-right: 10px;
-    }
-
-    .topbar-left {
-      display: flex;
-      align-items: center;
     }
 
     .app-title {
@@ -97,7 +96,12 @@
       padding: 6px 14px;
       font-size: 0.8rem;
       cursor: pointer;
-      transition: 0.2s;
+      transition: 0.18s;
+    }
+
+    .btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
     }
 
     .btn-primary {
@@ -105,8 +109,7 @@
       color: white;
       box-shadow: 0 4px 12px rgba(37, 99, 235, 0.5);
     }
-
-    .btn-primary:hover { background: #2563eb; }
+    .btn-primary:hover:not(:disabled) { background: #2563eb; }
 
     .btn-outline {
       border: 1px solid var(--border-subtle);
@@ -119,7 +122,17 @@
       color: white;
     }
 
-    /* Layout --------------------------------------------- */
+    select, input[type="number"] {
+      background: var(--input-bg);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-primary);
+      padding: 6px 10px;
+      border-radius: var(--radius-sm);
+      outline: none;
+      font-size: 0.85rem;
+    }
+
+    /* LAYOUT --------------------------------------------------- */
     .page {
       padding: 18px 24px;
       max-width: 1400px;
@@ -138,33 +151,18 @@
       padding: 18px;
       border: 1px solid var(--border-subtle);
       box-shadow: var(--shadow-soft);
-      position: relative;
     }
 
     .panel-title {
       font-size: 1rem;
       font-weight: 600;
-      margin-bottom: 6px;
+      margin-bottom: 4px;
     }
 
     .panel-caption {
       font-size: 0.78rem;
       color: var(--text-muted);
       margin-bottom: 10px;
-    }
-
-    label {
-      font-size: 0.85rem;
-      color: var(--text-muted);
-    }
-
-    select, input[type="number"] {
-      background: var(--input-bg);
-      border: 1px solid var(--border-subtle);
-      color: var(--text-primary);
-      padding: 6px 10px;
-      border-radius: var(--radius-sm);
-      outline: none;
     }
 
     textarea {
@@ -175,15 +173,22 @@
       color: var(--text-primary);
       padding: 8px;
       border-radius: var(--radius-sm);
-      font-family: monospace;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace;
       font-size: 0.8rem;
+      resize: vertical;
     }
 
-    .latest-value-row {
+    .latest-row {
       display: flex;
       justify-content: space-between;
+      align-items: baseline;
       padding: 4px 0;
       border-bottom: 1px dashed rgba(255,255,255,0.08);
+      font-size: 0.82rem;
+    }
+
+    .latest-row:last-child {
+      border-bottom: none;
     }
 
     canvas {
@@ -195,15 +200,27 @@
       display: inline-flex;
       align-items: center;
       padding: 4px 10px;
-      background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(148,163,184,0.3);
       border-radius: 999px;
-      margin-right: 6px;
+      margin: 2px 6px 6px 0;
+      font-size: 0.8rem;
+      gap: 6px;
       cursor: pointer;
+    }
+
+    .checkbox-pill input {
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    @media (max-width: 900px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
     }
   </style>
 </head>
-
 <body>
   <!-- TOP BAR -->
   <header class="topbar">
@@ -211,409 +228,460 @@
       <div class="app-logo"></div>
       <div>
         <div class="app-title">Device Console</div>
-        <div class="topbar-subtitle">Hex protocol · Serial monitor · Plotting · Logging</div>
+        <div class="topbar-subtitle">
+          Hex protocol · Flexible notify · Read/Write · Plot & Log
+        </div>
       </div>
     </div>
-
     <div style="display:flex; align-items:center; gap:12px;">
       <div class="status-pill">
         <span id="statusDot" class="status-dot"></span>
         <span id="statusText"><strong>Disconnected</strong></span>
       </div>
-
-      <label>Baud</label>
+      <label for="baudRate" style="font-size:0.8rem; color:var(--text-muted);">Baud</label>
       <select id="baudRate">
         <option value="115200" selected>115200</option>
         <option value="57600">57600</option>
         <option value="38400">38400</option>
       </select>
-
       <button id="connectBtn" class="btn btn-primary">Connect</button>
       <button id="disconnectBtn" class="btn btn-outline btn-danger" disabled>Disconnect</button>
     </div>
   </header>
 
-
-  <!-- MAIN -->
+  <!-- MAIN CONTENT -->
   <main class="page">
     <div class="grid">
-      
       <!-- LEFT COLUMN -->
       <div style="display:flex; flex-direction:column; gap:20px;">
-        
         <!-- VARIABLES PANEL -->
         <div class="panel">
           <div class="panel-title">Variables</div>
-          <div class="panel-caption">Select a variable and interact with the device</div>
-
-          <label>Variable</label><br>
-          <select id="varSelect"></select>
-          <br><br>
-
-          <button id="readVarBtn" class="btn btn-outline" disabled>Read</button>
-          <br><br>
-
-          <label>Write value</label><br>
-          <input id="writeValue" type="number" style="width:120px;">
-          <button id="writeVarBtn" class="btn btn-outline" disabled>Write</button>
-          <br><br>
-
-          <button id="notifyStartBtn" class="btn btn-primary" disabled>Start Notify</button>
-          <button id="notifyStopBtn" class="btn btn-outline" disabled>Stop Notify</button>
+          <div class="panel-caption">
+            Select a variable and perform read/write operations
+          </div>
+          <div style="margin-bottom:10px;">
+            <label for="varSelect" style="font-size:0.85rem; color:var(--text-muted);">Variable</label><br>
+            <select id="varSelect" style="margin-top:4px; width:100%;"></select>
+          </div>
+          <div style="margin-bottom:10px;">
+            <button id="readVarBtn" class="btn btn-outline" disabled>Read</button>
+          </div>
+          <div>
+            <label for="writeValue" style="font-size:0.85rem; color:var(--text-muted);">Write value</label><br>
+            <input id="writeValue" type="number" style="margin-top:4px; width:120px;">
+            <button id="writeVarBtn" class="btn btn-outline" disabled>Write</button>
+          </div>
+          <div style="margin-top:10px; font-size:0.78rem; color:var(--text-muted);">
+            Value encoding (int16/int32/float32, scaling, signedness) is taken from
+            <code>variables.json</code>.
+          </div>
         </div>
-
-        <!-- RESET / TOOLS PANEL -->
-        <div class="panel">
-            <div class="panel-title">Tools</div>
-            <div class="panel-caption">Reset logs, values, and chart</div>
-
-            <button id="clearRxBtn2" class="btn btn-outline" style="width:100%; margin-bottom:8px;">
-                Clear Raw RX Log
-            </button>
-
-            <button id="clearValueLogBtn" class="btn btn-outline" style="width:100%; margin-bottom:8px;">
-                Clear Value Log
-            </button>
-
-            <button id="clearChartBtn" class="btn btn-outline" style="width:100%; margin-bottom:8px;">
-                Reset Chart
-            </button>
-
-            <button id="clearLatestBtn" class="btn btn-outline" style="width:100%;">
-                Clear Latest Values
-            </button>
-        </div>
-
 
         <!-- LATEST VALUES PANEL -->
         <div class="panel">
           <div class="panel-title">Latest Values</div>
-          <div class="panel-caption">Automatically updates when data arrives</div>
+          <div class="panel-caption">
+            Last received value for each variable (from read/notify)
+          </div>
           <div id="latestValuesContainer"></div>
         </div>
 
-      </div>
+        <!-- NOTIFY CHANNELS PANEL -->
+        <div class="panel">
+          <div class="panel-title">Notify Channels</div>
+          <div class="panel-caption">
+            Notifications are device-driven. Select which Notify IDs to decode.
+          </div>
+          <div id="notifyListenContainer" class="small"></div>
+        </div>
 
+        <!-- TOOLS PANEL -->
+        <div class="panel">
+          <div class="panel-title">Tools</div>
+          <div class="panel-caption">Reset logs, chart, and latest values</div>
+
+          <button id="clearRxBtn" class="btn btn-outline" style="width:100%; margin-bottom:8px;">
+            Clear Raw RX Log
+          </button>
+          <button id="clearValueLogBtn" class="btn btn-outline" style="width:100%; margin-bottom:8px;">
+            Clear Value Log
+          </button>
+          <button id="clearChartBtn" class="btn btn-outline" style="width:100%; margin-bottom:8px;">
+            Reset Chart
+          </button>
+          <button id="clearLatestBtn" class="btn btn-outline" style="width:100%;">
+            Clear Latest Values
+          </button>
+        </div>
+      </div>
 
       <!-- RIGHT COLUMN -->
       <div style="display:flex; flex-direction:column; gap:20px;">
-
         <!-- PLOT PANEL -->
         <div class="panel">
           <div class="panel-title">Live Plot</div>
-          <div class="panel-caption">One dataset per variable</div>
-
+          <div class="panel-caption">
+            Each variable is plotted as its own dataset (x = time, y = value)
+          </div>
           <div id="plotVarContainer" style="margin-bottom:10px;"></div>
-
           <canvas id="dataChart" height="240"></canvas>
-
-          <button id="downloadLogBtn" class="btn btn-outline" style="margin-top:8px;">
-            Download Log (.txt)
-          </button>
-          <span id="logInfo" style="font-size:0.78rem; color:var(--text-muted); margin-left:6px;"></span>
+          <div style="margin-top:8px;">
+            <button id="downloadLogBtn" class="btn btn-outline">
+              Download Log (.txt)
+            </button>
+            <span id="logInfo" style="font-size:0.78rem; color:var(--text-muted); margin-left:6px;"></span>
+          </div>
         </div>
 
-
-        <!-- RAW HEX PANEL -->
+        <!-- RAW RX PANEL -->
         <div class="panel">
           <div class="panel-title">Raw RX (Hex)</div>
-          <div class="panel-caption">Raw bytes received from UART</div>
-
+          <div class="panel-caption">
+            Raw bytes received from UART, formatted as hexadecimal
+          </div>
           <textarea id="rxLog" readonly></textarea>
-          <button id="clearRxBtn" class="btn btn-outline" style="margin-top:8px;">Clear</button>
         </div>
-
       </div>
-
     </div>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
-    /* ========== LOAD VARIABLES.JSON ========== */
+    /************************************************************
+     * PROTOCOL CONFIG
+     ************************************************************/
+    const PROTOCOL = {
+      SOF: 0xAA,
+      EOF: 0x55,
+      lenIncludesType: true, // LEN = TYPE + PAYLOAD length
+      useCRC: true,
+      crcAlgorithm: 'xor8'
+    };
 
+    const CMD_READ_VAR      = 0x01;
+    const CMD_WRITE_VAR     = 0x02;
+    const CMD_READ_RESPONSE = 0x81;
+    const CMD_NOTIFY_DATA   = 0x82;
+
+    /************************************************************
+     * GLOBAL STATE
+     ************************************************************/
     let VARIABLE_DB = [];
+    let NOTIFY_CONFIG = [];
 
-    async function loadVariableDb() {
+    // valueLog: {time, kind, varId, name, value, unit}
+    const valueLog = [];
+
+    // Latest values: varId -> { value, unit, time }
+    const latestValues = new Map();
+
+    // Notify listen: notifyId -> boolean
+    const notifyListenState = new Map();
+
+    // Serial
+    let port = null;
+    let reader = null;
+    let keepReading = false;
+
+    // Buffers
+    let rxBuffer = [];
+
+    // Chart
+    const chartCtx = document.createElement("canvas").getContext; // dummy to avoid TS hints
+    let dataChart;
+    const datasets = [];
+    const MAX_POINTS = 300;
+    const t0 = performance.now();
+
+    /************************************************************
+     * DOM ELEMENTS
+     ************************************************************/
+    const statusDot   = document.getElementById("statusDot");
+    const statusText  = document.getElementById("statusText");
+    const baudSelect  = document.getElementById("baudRate");
+    const connectBtn  = document.getElementById("connectBtn");
+    const disconnectBtn = document.getElementById("disconnectBtn");
+
+    const varSelect   = document.getElementById("varSelect");
+    const readVarBtn  = document.getElementById("readVarBtn");
+    const writeVarBtn = document.getElementById("writeVarBtn");
+    const writeValue  = document.getElementById("writeValue");
+
+    const latestValuesContainer   = document.getElementById("latestValuesContainer");
+    const notifyListenContainer   = document.getElementById("notifyListenContainer");
+    const plotVarContainer        = document.getElementById("plotVarContainer");
+    const rxLog                   = document.getElementById("rxLog");
+    const logInfo                 = document.getElementById("logInfo");
+
+    const clearRxBtn        = document.getElementById("clearRxBtn");
+    const clearValueLogBtn  = document.getElementById("clearValueLogBtn");
+    const clearChartBtn     = document.getElementById("clearChartBtn");
+    const clearLatestBtn    = document.getElementById("clearLatestBtn");
+    const downloadLogBtn    = document.getElementById("downloadLogBtn");
+
+    /************************************************************
+     * CONFIG LOAD
+     ************************************************************/
+    async function loadConfigs() {
       try {
-        const res = await fetch('variables.json');
-        VARIABLE_DB = await res.json();
+        const [varRes, notifyRes] = await Promise.all([
+          fetch("variables.json"),
+          fetch("notify_config.json")
+        ]);
+
+        VARIABLE_DB = await varRes.json();
+        const notifyJson = await notifyRes.json();
+        NOTIFY_CONFIG = notifyJson.notifyCases || [];
 
         initVariableDropdowns();
         initLatestValuesUI();
-        initChartDatasets();
-
+        initNotifyUI();
+        initChart();
       } catch (e) {
-        alert("Failed to load variables.json");
-        console.error(e);
+        console.error("Failed to load configs:", e);
+        alert("Failed to load variables.json or notify_config.json");
       }
     }
 
-    loadVariableDb();
+    loadConfigs();
 
-
-    /* ========== UI ELEMENTS ========== */
-
-    const statusDot = document.getElementById("statusDot");
-    const statusText = document.getElementById("statusText");
-    const varSelect = document.getElementById("varSelect");
-    const rxLog = document.getElementById("rxLog");
-
-    const readVarBtn = document.getElementById("readVarBtn");
-    const writeVarBtn = document.getElementById("writeVarBtn");
-    const notifyStartBtn = document.getElementById("notifyStartBtn");
-    const notifyStopBtn = document.getElementById("notifyStopBtn");
-    const writeValueInput = document.getElementById("writeValue");
-
-    const plotVarContainer = document.getElementById("plotVarContainer");
-    const latestValuesContainer = document.getElementById("latestValuesContainer");
-
-
-    /* ========== PROTOCOL CONSTANTS ========== */
-
-    const SOF = 0xAA;
-    const EOF = 0x55;
-
-    const CMD_READ_VAR = 0x01;
-    const CMD_WRITE_VAR = 0x02;
-    const CMD_NOTIFY_START = 0x03;
-    const CMD_NOTIFY_STOP = 0x04;
-
-    const CMD_READ_RESPONSE = 0x81;
-    const CMD_NOTIFY_DATA = 0x82;
-
-
-    /* ========== SERIAL HANDLING ========== */
-
-    let port = null;
-    let keepReading = false;
-    let reader = null;
-
-    async function connectSerial() {
-      port = await navigator.serial.requestPort();
-      const baud = parseInt(document.getElementById("baudRate").value);
-
-      await port.open({ baudRate: baud });
-
-      statusDot.classList.add("connected");
-      statusText.innerHTML = `<strong>Connected</strong> (${baud})`;
-
-      readVarBtn.disabled = writeVarBtn.disabled =
-      notifyStartBtn.disabled = notifyStopBtn.disabled = false;
-
-      keepReading = true;
-      readLoop();
+    /************************************************************
+     * HELPERS
+     ************************************************************/
+    function getVarById(id) {
+      return VARIABLE_DB.find(v => v.id === id);
     }
 
-    async function readLoop() {
-      reader = port.readable.getReader();
-      try {
-        while (keepReading) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          if (value) handleIncomingBytes(value);
-        }
-      } catch (err) {
-        console.error(err);
-      } finally {
-        reader.releaseLock();
+    function getNotifyCaseById(id) {
+      return NOTIFY_CONFIG.find(c => c.id === id);
+    }
+
+    function setConnectedState(isConnected, info = "") {
+      if (isConnected) {
+        statusDot.classList.add("connected");
+        statusText.innerHTML = `<strong>Connected</strong> <span style="color:#94a3b8;">(${info})</span>`;
+        connectBtn.disabled = true;
+        disconnectBtn.disabled = false;
+        readVarBtn.disabled = false;
+        writeVarBtn.disabled = false;
+      } else {
+        statusDot.classList.remove("connected");
+        statusText.innerHTML = `<strong>Disconnected</strong>`;
+        connectBtn.disabled = false;
+        disconnectBtn.disabled = true;
+        readVarBtn.disabled = true;
+        writeVarBtn.disabled = true;
       }
     }
 
-    async function disconnectSerial() {
-      keepReading = false;
-      if (reader) reader.cancel();
-      if (port) await port.close();
-
-      statusDot.classList.remove("connected");
-      statusText.innerHTML = `<strong>Disconnected</strong>`;
-
-      readVarBtn.disabled = writeVarBtn.disabled =
-      notifyStartBtn.disabled = notifyStopBtn.disabled = true;
-    }
-
-
-    document.getElementById("connectBtn").addEventListener("click", connectSerial);
-    document.getElementById("disconnectBtn").addEventListener("click", disconnectSerial);
-    document.getElementById("clearRxBtn").addEventListener("click", () => rxLog.value = "");
-
-
-    /* ========== SEND COMMANDS ========== */
-
-    function crcXor(frame, start, end) {
+    function crcXor8(bytes, startIdx, endIdx) {
       let crc = 0;
-      for (let i = start; i <= end; i++) crc ^= frame[i];
-      return crc & 0xff;
+      for (let i = startIdx; i <= endIdx; i++) {
+        crc ^= bytes[i];
+      }
+      return crc & 0xFF;
     }
 
-    function buildFrame(type, payload) {
-      const len = 1 + payload.length;    // TYPE + PAYLOAD
-      const frame = new Uint8Array(1 + 1 + len + 1 + 1);
+    function computeCRC(frame, startIdx, endIdx) {
+      if (!PROTOCOL.useCRC) return 0;
+      switch (PROTOCOL.crcAlgorithm) {
+        case "xor8":
+        default:
+          return crcXor8(frame, startIdx, endIdx);
+      }
+    }
 
+    // Build: SOF | LEN | TYPE | PAYLOAD... | CRC | EOF
+    function buildFrame(type, payloadBytes) {
+      const payloadLen = payloadBytes.length;
+      const lenField = PROTOCOL.lenIncludesType ? (1 + payloadLen) : payloadLen;
+
+      const frameLen = 1 + 1 + 1 + payloadLen + 1 + 1;
+      const frame = new Uint8Array(frameLen);
       let i = 0;
-      frame[i++] = SOF;
-      frame[i++] = len;
+
+      frame[i++] = PROTOCOL.SOF;
+      frame[i++] = lenField;
       frame[i++] = type;
-      payload.forEach(b => frame[i++] = b);
-      frame[i++] = crcXor(frame, 1, i - 1);
-      frame[i++] = EOF;
+      payloadBytes.forEach(b => frame[i++] = b);
+      const crc = computeCRC(frame, 1, i - 1);
+      frame[i++] = crc;
+      frame[i++] = PROTOCOL.EOF;
 
       return frame;
     }
 
-    async function sendFrame(frame) {
-      const writer = port.writable.getWriter();
-      await writer.write(frame);
-      writer.releaseLock();
-    }
+    function encodeValueBytes(vDef, jsValue, endianness = "lsbFirst") {
+      const fmt   = vDef.format || "int16";
+      const scale = vDef.scale ?? 1.0;
 
-    readVarBtn.onclick = async () => {
-      const v = getSelectedVar();
-      sendFrame(buildFrame(CMD_READ_VAR, [v.id]));
-    };
-
-    writeVarBtn.onclick = async () => {
-      const v = getSelectedVar();
-      const val = parseInt(writeValueInput.value);
-      const lo = val & 0xff;
-      const hi = (val >> 8) & 0xff;
-      sendFrame(buildFrame(CMD_WRITE_VAR, [v.id, lo, hi]));
-    };
-
-    notifyStartBtn.onclick = () => {
-      sendFrame(buildFrame(CMD_NOTIFY_START, [getSelectedVar().id]));
-    };
-
-    notifyStopBtn.onclick = () => {
-      sendFrame(buildFrame(CMD_NOTIFY_STOP, [getSelectedVar().id]));
-    };
-
-
-    /* ========== PARSE INCOMING BYTES ========== */
-
-    let rxBuffer = [];
-
-    function handleIncomingBytes(chunk) {
-      chunk.forEach(b => rxBuffer.push(b));
-
-      rxLog.value += [...chunk].map(b => b.toString(16).padStart(2,"0")).join(" ") + "\n";
-      rxLog.scrollTop = rxLog.scrollHeight;
-
-      parseFrames();
-    }
-
-    function parseFrames() {
-      while (rxBuffer.length >= 5) {
-        if (rxBuffer[0] !== SOF) { rxBuffer.shift(); continue; }
-
-        const len = rxBuffer[1];
-        const frameLength = 1 + 1 + len + 1 + 1;
-
-        if (rxBuffer.length < frameLength) return;
-
-        const frame = rxBuffer.slice(0, frameLength);
-        rxBuffer = rxBuffer.slice(frameLength);
-
-        if (frame[frameLength - 1] !== EOF) continue;
-
-        const crc = frame[frameLength - 2];
-        const calc = crcXor(frame, 1, frameLength - 3);
-        if (crc !== calc) continue;
-
-        const type = frame[2];
-        const payload = frame.slice(3, frameLength - 2);
-
-        interpretFrame(type, payload);
+      if (fmt === "float32") {
+        const val = jsValue / scale;
+        const buf = new ArrayBuffer(4);
+        const view = new DataView(buf);
+        view.setFloat32(0, val, false); // big-endian
+        let arr = [
+          view.getUint8(0),
+          view.getUint8(1),
+          view.getUint8(2),
+          view.getUint8(3)
+        ];
+        if (endianness === "lsbFirst") arr = arr.reverse();
+        return arr;
       }
-    }
 
+      let raw = Math.round(jsValue / scale);
+      let bytes = [];
 
-    /* ========== FRAME INTERPRETATION ========== */
-
-    const latestValues = new Map();
-    const valueLog = [];
-
-    function interpretFrame(type, payload) {
-      if (payload.length < 1) return;
-
-      if (type === CMD_READ_RESPONSE || type === CMD_NOTIFY_DATA) {
-        const varId = payload[0];
-        const lo = payload[1];
-        const hi = payload[2];
-
-        let value = (hi << 8) | lo;
-        if (value & 0x8000) value = value - 65536;
-
-        const v = VARIABLE_DB.find(x => x.id === varId);
-        if (!v) return;
-
-        // Update latest values
-        latestValues.set(varId, value);
-        const el = document.getElementById(`latest-${varId}`);
-        if (el) el.textContent = value + " " + (v.unit || "");
-
-        // Log value
-        valueLog.push({
-          time: new Date().toISOString(),
-          varId,
-          name: v.name,
-          value,
-          unit: v.unit
-        });
-        document.getElementById("logInfo").textContent = valueLog.length + " samples";
-
-        addChartPoint(varId, value);
+      if (fmt === "int16" || fmt === "uint16") {
+        let v = raw & 0xFFFF;
+        bytes = [(v & 0xFF), (v >> 8) & 0xFF]; // LSB, MSB
+      } else if (fmt === "int32" || fmt === "uint32") {
+        let v = raw >>> 0;
+        bytes = [
+          v & 0xFF,
+          (v >> 8) & 0xFF,
+          (v >> 16) & 0xFF,
+          (v >> 24) & 0xFF
+        ]; // LSB first
+      } else {
+        // default int16
+        let v = raw & 0xFFFF;
+        bytes = [(v & 0xFF), (v >> 8) & 0xFF];
       }
+
+      if (endianness === "msbFirst") bytes = bytes.slice().reverse();
+      return bytes;
     }
 
+    function decodeValueBytes(vDef, bytes, endianness = "lsbFirst") {
+      const fmt    = vDef.format || "int16";
+      const signed = vDef.signed ?? true;
+      const scale  = vDef.scale ?? 1.0;
 
-    /* ========== VARIABLE DROPDOWN & UI INIT ========== */
+      let arr = Array.from(bytes);
+      // re-order to big-endian in arr[0..n]
+      if (endianness === "lsbFirst") arr = arr.slice().reverse();
 
+      let raw = 0;
+
+      if (fmt === "int16" || fmt === "uint16") {
+        if (arr.length < 2) return null;
+        raw = (arr[0] << 8) | arr[1];
+        if ((fmt === "int16" || signed) && (raw & 0x8000)) {
+          raw -= 0x10000;
+        }
+      } else if (fmt === "int32" || fmt === "uint32") {
+        if (arr.length < 4) return null;
+        raw = (arr[0] << 24) | (arr[1] << 16) | (arr[2] << 8) | arr[3];
+        if ((fmt === "int32" || signed) && (raw & 0x80000000)) {
+          raw = raw | 0xFFFFFFFF00000000;
+        }
+      } else if (fmt === "float32") {
+        if (arr.length < 4) return null;
+        const buf = new ArrayBuffer(4);
+        const view = new DataView(buf);
+        arr.forEach((b, i) => view.setUint8(i, b));
+        const fval = view.getFloat32(0, false);
+        return fval * scale;
+      } else {
+        // generic unsigned int
+        raw = 0;
+        arr.forEach(b => { raw = (raw << 8) | b; });
+      }
+
+      return raw * scale;
+    }
+
+    function applyDecodedValue(kind, varId, value) {
+      const v = getVarById(varId);
+      if (!v) return;
+      const unit = v.unit || "";
+
+      // Latest values
+      const slot = document.getElementById(`latest-${varId}`);
+      if (slot) slot.textContent = `${value} ${unit}`;
+
+      // Log
+      valueLog.push({
+        time: new Date().toISOString(),
+        kind,
+        varId,
+        name: v.name,
+        value,
+        unit
+      });
+      logInfo.textContent = `${valueLog.length} samples`;
+
+      // Chart
+      addChartPoint(varId, value);
+    }
+
+    /************************************************************
+     * UI INIT
+     ************************************************************/
     function initVariableDropdowns() {
+      varSelect.innerHTML = "";
       VARIABLE_DB.forEach(v => {
-        varSelect.innerHTML += `<option value="${v.id}">
-          ${v.name} (0x${v.id.toString(16)})
-        </option>`;
+        const opt = document.createElement("option");
+        opt.value = v.id;
+        opt.textContent = `${v.name} (0x${v.id.toString(16)})`;
+        varSelect.appendChild(opt);
       });
     }
 
     function initLatestValuesUI() {
       latestValuesContainer.innerHTML = "";
       VARIABLE_DB.forEach(v => {
-        latestValuesContainer.innerHTML += `
-          <div class="latest-value-row">
-            <div><strong>${v.name}</strong> <span style="color:#94a3b8">(0x${v.id.toString(16)})</span></div>
-            <div id="latest-${v.id}" style="color:#94a3b8">—</div>
-          </div>`;
+        const row = document.createElement("div");
+        row.className = "latest-row";
+
+        const left = document.createElement("div");
+        left.innerHTML =
+          `<strong>${v.name}</strong> <span style="color:#94a3b8;">(0x${v.id.toString(16)})</span>`;
+
+        const right = document.createElement("div");
+        right.id = `latest-${v.id}`;
+        right.style.color = "#94a3b8";
+        right.textContent = "—";
+
+        row.appendChild(left);
+        row.appendChild(right);
+        latestValuesContainer.appendChild(row);
+
+        latestValues.set(v.id, { value: null, unit: v.unit || "", time: null });
       });
     }
 
-    function getSelectedVar() {
-      const id = parseInt(varSelect.value);
-      return VARIABLE_DB.find(v => v.id === id);
+    function initNotifyUI() {
+      notifyListenContainer.innerHTML = "";
+      notifyListenState.clear();
+
+      NOTIFY_CONFIG.forEach(cfg => {
+        const label = document.createElement("label");
+        label.className = "checkbox-pill";
+
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.checked = !!cfg.enabledByDefault;
+        cb.dataset.notifyId = cfg.id;
+        cb.onchange = () => {
+          notifyListenState.set(cfg.id, cb.checked);
+        };
+
+        notifyListenState.set(cfg.id, !!cfg.enabledByDefault);
+
+        label.appendChild(cb);
+        label.appendChild(
+          document.createTextNode(`ID ${cfg.id} – ${cfg.name || "Notify"}`)
+        );
+        notifyListenContainer.appendChild(label);
+      });
     }
 
-
-    /* ========== CHART ========== */
-
-    const chartCtx = document.getElementById("dataChart").getContext("2d");
-    const datasets = [];
-    const MAX_POINTS = 300;
-    const t0 = performance.now();
-
-    const dataChart = new Chart(chartCtx, {
-      type: 'line',
-      data: { datasets },
-      options: {
-        animation: false,
-        scales: {
-          x: { type: 'linear', title: { display: true, text: 'Time (s)' }},
-          y: { title: { display: true, text: "Value" }}
-        }
-      }
-    });
-
-    function initChartDatasets() {
+    function initChart() {
+      const ctx = document.getElementById("dataChart").getContext("2d");
       VARIABLE_DB.forEach((v, idx) => {
         datasets.push({
           label: v.name,
@@ -626,86 +694,339 @@
           parsing: false
         });
 
-        plotVarContainer.innerHTML += `
-          <label class="checkbox-pill">
-            <input type="checkbox" data-id="${v.id}" ${idx===0?"checked":""}>
-            ${v.name}
-          </label>
-        `;
-      });
-
-      plotVarContainer.querySelectorAll("input").forEach(cb => {
+        const label = document.createElement("label");
+        label.className = "checkbox-pill";
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.checked = (idx === 0);
+        cb.dataset.varId = v.id;
         cb.onchange = () => {
-          const varId = parseInt(cb.dataset.id);
-          const ds = datasets.find(d => d.varId === varId);
+          const ds = datasets.find(d => d.varId === v.id);
           ds.hidden = !cb.checked;
           dataChart.update();
         };
+        label.appendChild(cb);
+        label.appendChild(document.createTextNode(v.name));
+        plotVarContainer.appendChild(label);
       });
-    }
 
-    function addChartPoint(varId, value) {
-      const t = (performance.now() - t0) / 1000;
-      const ds = datasets.find(d => d.varId === varId);
-      if (!ds) return;
-
-      ds.data.push({ x: t, y: value });
-      if (ds.data.length > MAX_POINTS) ds.data.shift();
-      dataChart.update('none');
+      dataChart = new Chart(ctx, {
+        type: "line",
+        data: { datasets },
+        options: {
+          animation: false,
+          responsive: true,
+          scales: {
+            x: {
+              type: "linear",
+              title: { display: true, text: "Time (s)" },
+              ticks: { color: "#94a3b8" },
+              grid: { color: "rgba(148,163,184,0.15)" }
+            },
+            y: {
+              title: { display: true, text: "Value" },
+              ticks: { color: "#94a3b8" },
+              grid: { color: "rgba(148,163,184,0.18)" }
+            }
+          },
+          plugins: {
+            legend: {
+              labels: {
+                color: "#e5e7eb",
+                font: { size: 11 }
+              }
+            }
+          }
+        }
+      });
     }
 
     function getColor(i) {
-      const palette = ["#3b82f6","#22c55e","#ef4444","#eab308","#a855f7","#14b8a6"];
+      const palette = ["#3b82f6", "#22c55e", "#ef4444", "#eab308", "#a855f7", "#14b8a6"];
       return palette[i % palette.length];
     }
 
+    function addChartPoint(varId, value) {
+      const ds = datasets.find(d => d.varId === varId);
+      if (!ds) return;
+      const t = (performance.now() - t0) / 1000;
+      ds.data.push({ x: t, y: value });
+      if (ds.data.length > MAX_POINTS) ds.data.shift();
+      dataChart.update("none");
+    }
 
-    /* ========== LOG DOWNLOAD ========== */
+    function getSelectedVar() {
+      const id = parseInt(varSelect.value);
+      return getVarById(id);
+    }
 
-    document.getElementById("downloadLogBtn").onclick = () => {
-      if (!valueLog.length) return alert("No data yet");
+    /************************************************************
+     * SERIAL HANDLING
+     ************************************************************/
+    async function connectSerial() {
+      if (!("serial" in navigator)) {
+        alert("Web Serial API not supported in this browser.");
+        return;
+      }
+      try {
+        port = await navigator.serial.requestPort();
+        const baud = parseInt(baudSelect.value, 10);
+        await port.open({ baudRate: baud, dataBits: 8, stopBits: 1, parity: "none" });
 
-      let text = "time,varId,name,value,unit\n";
-      valueLog.forEach(s => {
-        text += `${s.time},0x${s.varId.toString(16)},${s.name},${s.value},${s.unit}\n`;
+        setConnectedState(true, `baud ${baud}`);
+        keepReading = true;
+        readLoop();
+      } catch (e) {
+        console.error("Failed to open port:", e);
+        alert("Failed to open serial port");
+      }
+    }
+
+    async function readLoop() {
+      if (!port.readable) return;
+      reader = port.readable.getReader();
+      try {
+        while (keepReading) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          if (value && value.length > 0) handleIncomingBytes(value);
+        }
+      } catch (e) {
+        console.error("Read error:", e);
+      } finally {
+        if (reader) reader.releaseLock();
+        reader = null;
+        setConnectedState(false);
+      }
+    }
+
+    async function disconnectSerial() {
+      try {
+        keepReading = false;
+        if (reader) {
+          await reader.cancel().catch(() => {});
+          reader.releaseLock();
+          reader = null;
+        }
+        if (port) {
+          await port.close();
+          port = null;
+        }
+      } catch (e) {
+        console.error("Disconnect error:", e);
+      } finally {
+        setConnectedState(false);
+      }
+    }
+
+    async function sendFrame(frame) {
+      if (!port || !port.writable) {
+        alert("Not connected");
+        return;
+      }
+      const writer = port.writable.getWriter();
+      try {
+        await writer.write(frame);
+      } catch (e) {
+        console.error("Write error:", e);
+      } finally {
+        writer.releaseLock();
+      }
+    }
+
+    connectBtn.addEventListener("click", connectSerial);
+    disconnectBtn.addEventListener("click", disconnectSerial);
+
+    /************************************************************
+     * RX PARSING
+     ************************************************************/
+    function handleIncomingBytes(chunk) {
+      // Raw hex log
+      const hexLine = Array.from(chunk)
+        .map(b => b.toString(16).padStart(2, "0"))
+        .join(" ");
+      rxLog.value += hexLine + "\n";
+      rxLog.scrollTop = rxLog.scrollHeight;
+
+      // Accumulate for framing
+      for (const b of chunk) rxBuffer.push(b);
+      parseFramesFromBuffer();
+    }
+
+    function parseFramesFromBuffer() {
+      const MIN_FRAME = 5; // SOF + LEN + TYPE + CRC + EOF (no payload)
+
+      while (rxBuffer.length >= MIN_FRAME) {
+        const sofIndex = rxBuffer.indexOf(PROTOCOL.SOF);
+        if (sofIndex === -1) {
+          rxBuffer = [];
+          return;
+        }
+        if (sofIndex > 0) {
+          rxBuffer = rxBuffer.slice(sofIndex);
+        }
+        if (rxBuffer.length < MIN_FRAME) return;
+
+        const lenField = rxBuffer[1];
+        const payloadLen = PROTOCOL.lenIncludesType ? (lenField - 1) : lenField;
+        if (payloadLen < 0) {
+          rxBuffer.shift();
+          continue;
+        }
+
+        const totalFrameLen = 1 + 1 + 1 + payloadLen + 1 + 1;
+        if (rxBuffer.length < totalFrameLen) return;
+
+        const frame = rxBuffer.slice(0, totalFrameLen);
+        rxBuffer = rxBuffer.slice(totalFrameLen);
+
+        if (frame[frame.length - 1] !== PROTOCOL.EOF) {
+          console.warn("Bad EOF", frame);
+          continue;
+        }
+
+        const crcReceived = frame[frame.length - 2];
+        const crcComputed = computeCRC(frame, 1, frame.length - 3);
+        if (PROTOCOL.useCRC && crcReceived !== crcComputed) {
+          console.warn("CRC mismatch");
+          continue;
+        }
+
+        const type = frame[2];
+        const payloadStart = 3;
+        const payloadEnd = payloadStart + payloadLen;
+        const payload = frame.slice(payloadStart, payloadEnd);
+
+        interpretFrame(type, payload);
+      }
+    }
+
+    function interpretFrame(type, payload) {
+      if (type === CMD_READ_RESPONSE) {
+        handleReadResponse(payload);
+      } else if (type === CMD_NOTIFY_DATA) {
+        handleNotifyData(payload);
+      } else {
+        // unknown type, ignore or extend as needed
+      }
+    }
+
+    // READ_RESPONSE: [varId, data...]
+    function handleReadResponse(payload) {
+      if (payload.length < 2) return;
+      const varId = payload[0];
+      const vDef = getVarById(varId);
+      if (!vDef) return;
+
+      const dataBytes = payload.slice(1);
+      const value = decodeValueBytes(vDef, dataBytes, "lsbFirst");
+      if (value === null || value === undefined) return;
+
+      applyDecodedValue("READ", varId, value);
+    }
+
+    // NOTIFY_DATA: [notifyId, data...]
+    function handleNotifyData(payload) {
+      if (payload.length < 1) return;
+      const notifyId = payload[0];
+      const dataBytes = payload.slice(1);
+
+      if (!notifyListenState.get(notifyId)) return;
+
+      const cfg = getNotifyCaseById(notifyId);
+      if (!cfg || !cfg.variables) return;
+
+      cfg.variables.forEach(field => {
+        const vDef = getVarById(field.varId);
+        if (!vDef) return;
+
+        const start = field.startByte;
+        const len   = field.length;
+        const end   = start + len;
+        if (start < 0 || end > dataBytes.length) return;
+
+        const slice = dataBytes.slice(start, end);
+        const endianness = field.endianness || "lsbFirst";
+
+        const value = decodeValueBytes(vDef, slice, endianness);
+        if (value === null || value === undefined) return;
+
+        applyDecodedValue("NOTIFY", vDef.id, value);
       });
+    }
 
-      const blob = new Blob([text], { type: "text/plain" });
+    /************************************************************
+     * READ / WRITE BUTTON HANDLERS
+     ************************************************************/
+    readVarBtn.onclick = async () => {
+      const v = getSelectedVar();
+      if (!v) return;
+      const payload = [v.id];
+      await sendFrame(buildFrame(CMD_READ_VAR, payload));
+    };
+
+    writeVarBtn.onclick = async () => {
+      const v = getSelectedVar();
+      if (!v) return;
+      const val = parseFloat(writeValue.value);
+      if (Number.isNaN(val)) {
+        alert("Enter numeric value");
+        return;
+      }
+      const endianness = v.endianness || "lsbFirst";
+      const dataBytes = encodeValueBytes(v, val, endianness);
+      const payload = [v.id, ...dataBytes];
+      await sendFrame(buildFrame(CMD_WRITE_VAR, payload));
+    };
+
+    /************************************************************
+     * TOOLS & LOG DOWNLOAD
+     ************************************************************/
+    clearRxBtn.onclick = () => {
+      rxLog.value = "";
+      rxBuffer = [];
+    };
+
+    clearValueLogBtn.onclick = () => {
+      valueLog.length = 0;
+      logInfo.textContent = "0 samples";
+    };
+
+    clearChartBtn.onclick = () => {
+      datasets.forEach(ds => ds.data = []);
+      if (dataChart) dataChart.update();
+    };
+
+    clearLatestBtn.onclick = () => {
+      latestValues.forEach((v, varId) => {
+        const slot = document.getElementById(`latest-${varId}`);
+        if (slot) slot.textContent = "—";
+      });
+      latestValues.clear();
+    };
+
+    downloadLogBtn.onclick = () => {
+      if (!valueLog.length) {
+        alert("No data logged yet");
+        return;
+      }
+      let lines = ["time,kind,varId,name,value,unit"];
+      valueLog.forEach(s => {
+        lines.push(
+          `${s.time},${s.kind},0x${s.varId.toString(16)},${JSON.stringify(s.name)},${s.value},${JSON.stringify(s.unit || "")}`
+        );
+      });
+      const blob = new Blob([lines.join("\n")], { type: "text/plain;charset=utf-8" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
+      const ts = new Date().toISOString().replace(/[:.]/g, "-");
       a.href = url;
-      a.download = "values_log.txt";
+      a.download = `device_values_${ts}.txt`;
+      document.body.appendChild(a);
       a.click();
+      document.body.removeChild(a);
       URL.revokeObjectURL(url);
     };
-
-    /* ========== RESET BUTTON HANDLERS ========== */
-
-    document.getElementById("clearRxBtn2").onclick = () => {
-    rxLog.value = "";
-    rxBuffer = [];
-    };
-
-    document.getElementById("clearValueLogBtn").onclick = () => {
-    valueLog.length = 0;
-    document.getElementById("logInfo").textContent = "0 samples";
-    };
-
-    document.getElementById("clearChartBtn").onclick = () => {
-    datasets.forEach(ds => ds.data = []);
-    dataChart.update();
-    };
-
-    document.getElementById("clearLatestBtn").onclick = () => {
-    latestValues.forEach((_, varId) => {
-        latestValues.set(varId, null);
-        const el = document.getElementById(`latest-${varId}`);
-        if (el) el.textContent = "—";
-    });
-    };
-
-
   </script>
-
 </body>
 </html>

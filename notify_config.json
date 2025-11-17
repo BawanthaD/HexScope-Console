@@ -1,0 +1,43 @@
+{
+  "notifyCases": [
+    {
+      "id": 1,
+      "name": "Main telemetry",
+      "enabledByDefault": true,
+      "variables": [
+        {
+          "varId": 16,
+          "nameOverride": "Bus Voltage",
+          "startByte": 1,
+          "length": 2,
+          "endianness": "lsbFirst"
+        },
+        {
+          "varId": 17,
+          "startByte": 3,
+          "length": 2,
+          "endianness": "lsbFirst"
+        },
+        {
+          "varId": 18,
+          "startByte": 5,
+          "length": 2,
+          "endianness": "lsbFirst"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Fast status",
+      "enabledByDefault": false,
+      "variables": [
+        {
+          "varId": 16,
+          "startByte": 1,
+          "length": 2,
+          "endianness": "msbFirst"
+        }
+      ]
+    }
+  ]
+}

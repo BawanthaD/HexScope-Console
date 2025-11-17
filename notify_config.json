@@ -8,34 +8,15 @@
         {
           "varId": 16,
           "nameOverride": "Bus Voltage",
-          "startByte": 1,
-          "length": 2,
-          "endianness": "lsbFirst"
+          "formula": "B1 + B2 * 255 - 50"
         },
         {
           "varId": 17,
-          "startByte": 3,
-          "length": 2,
-          "endianness": "lsbFirst"
+          "formula": "B2 + B3 * 256"
         },
         {
           "varId": 18,
-          "startByte": 5,
-          "length": 2,
-          "endianness": "lsbFirst"
-        }
-      ]
-    },
-    {
-      "id": 2,
-      "name": "Fast status",
-      "enabledByDefault": false,
-      "variables": [
-        {
-          "varId": 16,
-          "startByte": 1,
-          "length": 2,
-          "endianness": "msbFirst"
+          "formula": "B4"
         }
       ]
     }

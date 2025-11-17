@@ -28,7 +28,7 @@
       color: var(--text-primary);
     }
 
-    /* TOP BAR -------------------------------------------------- */
+    /* TOP BAR */
     .topbar {
       position: sticky;
       top: 0;
@@ -132,7 +132,7 @@
       font-size: 0.85rem;
     }
 
-    /* LAYOUT --------------------------------------------------- */
+    /* LAYOUT */
     .page {
       padding: 18px 24px;
       max-width: 1400px;
@@ -229,7 +229,7 @@
       <div>
         <div class="app-title">Device Console</div>
         <div class="topbar-subtitle">
-          Hex protocol · Flexible notify · Read/Write · Plot & Log
+          Hex protocol · Flexible notify · Read/Write · Plot & CSV
         </div>
       </div>
     </div>
@@ -273,7 +273,7 @@
             <button id="writeVarBtn" class="btn btn-outline" disabled>Write</button>
           </div>
           <div style="margin-top:10px; font-size:0.78rem; color:var(--text-muted);">
-            Value encoding (int16/int32/float32, scaling, signedness) is taken from
+            Read/Write encoding (int16/int32/float32, scaling, signedness) is taken from
             <code>variables.json</code>.
           </div>
         </div>
@@ -305,7 +305,7 @@
             Clear Raw RX Log
           </button>
           <button id="clearValueLogBtn" class="btn btn-outline" style="width:100%; margin-bottom:8px;">
-            Clear Value Log
+            Clear CSV Logs
           </button>
           <button id="clearChartBtn" class="btn btn-outline" style="width:100%; margin-bottom:8px;">
             Reset Chart
@@ -328,7 +328,7 @@
           <canvas id="dataChart" height="240"></canvas>
           <div style="margin-top:8px;">
             <button id="downloadLogBtn" class="btn btn-outline">
-              Download Log (.txt)
+              Download CSV Logs
             </button>
             <span id="logInfo" style="font-size:0.78rem; color:var(--text-muted); margin-left:6px;"></span>
           </div>
@@ -370,8 +370,17 @@
     let VARIABLE_DB = [];
     let NOTIFY_CONFIG = [];
 
-    // valueLog: {time, kind, varId, name, value, unit}
-    const valueLog = [];
+    // Read/Write logs
+    const readWriteLog = []; // {time, kind, varId, name, value, unit}
+
+    // Notify logs: notifyId -> [{time, varId, name, value, unit}]
+    const notifyLogs = new Map();
+
+    function getTotalSampleCount() {
+      let total = readWriteLog.length;
+      notifyLogs.forEach(arr => { total += arr.length; });
+      return total;
+    }
 
     // Latest values: varId -> { value, unit, time }
     const latestValues = new Map();
@@ -388,7 +397,6 @@
     let rxBuffer = [];
 
     // Chart
-    const chartCtx = document.createElement("canvas").getContext; // dummy to avoid TS hints
     let dataChart;
     const datasets = [];
     const MAX_POINTS = 300;
@@ -496,7 +504,6 @@
     function buildFrame(type, payloadBytes) {
       const payloadLen = payloadBytes.length;
       const lenField = PROTOCOL.lenIncludesType ? (1 + payloadLen) : payloadLen;
-
       const frameLen = 1 + 1 + 1 + payloadLen + 1 + 1;
       const frame = new Uint8Array(frameLen);
       let i = 0;
@@ -505,7 +512,8 @@
       frame[i++] = lenField;
       frame[i++] = type;
       payloadBytes.forEach(b => frame[i++] = b);
-      const crc = computeCRC(frame, 1, i - 1);
+
+      const crc = computeCRC(frame, 1, 1 + lenField);
       frame[i++] = crc;
       frame[i++] = PROTOCOL.EOF;
 
@@ -594,27 +602,67 @@
       return raw * scale;
     }
 
-    function applyDecodedValue(kind, varId, value) {
+    // Formula evaluator for NOTIFY: e.g. "B0 + B1*255 - 50"
+    // B0 = first data byte after notifyId, B1 = second, etc.
+    function evaluateNotifyFormula(formula, dataBytes) {
+      if (!formula) return null;
+      // Replace B<number> with b[<number>] (array access)
+      let expr = formula.replace(/B(\d+)/gi, (_, idx) => ` (b[${parseInt(idx,10)}] ?? 0) `);
+
+      // Basic sanity check: only allow digits, operators, parentheses, spaces, 'b', '[', ']', '.'
+      if (!/^[0-9+\-*/().,\s b\[\]?<>!=&|^%]*$/i.test(expr)) {
+        console.warn("Unsafe characters in formula:", formula);
+        return null;
+      }
+
+      try {
+        const fn = new Function("b", "return " + expr + ";");
+        const val = fn(dataBytes);
+        if (typeof val === "number" && isFinite(val)) {
+          return val;
+        }
+      } catch (e) {
+        console.warn("Error evaluating formula:", formula, e);
+      }
+      return null;
+    }
+
+    function applyDecodedValue(kind, varId, value, meta = {}) {
       const v = getVarById(varId);
       if (!v) return;
       const unit = v.unit || "";
 
-      // Latest values
       const slot = document.getElementById(`latest-${varId}`);
       if (slot) slot.textContent = `${value} ${unit}`;
 
-      // Log
-      valueLog.push({
-        time: new Date().toISOString(),
-        kind,
-        varId,
-        name: v.name,
-        value,
-        unit
-      });
-      logInfo.textContent = `${valueLog.length} samples`;
+      const time = new Date().toISOString();
 
-      // Chart
+      if (kind === "READ" || kind === "WRITE") {
+        readWriteLog.push({
+          time,
+          kind,
+          varId,
+          name: v.name,
+          value,
+          unit
+        });
+      } else if (kind === "NOTIFY") {
+        const notifyId = meta.notifyId;
+        if (notifyId != null) {
+          if (!notifyLogs.has(notifyId)) {
+            notifyLogs.set(notifyId, []);
+          }
+          notifyLogs.get(notifyId).push({
+            time,
+            varId,
+            name: v.name,
+            value,
+            unit
+          });
+        }
+      }
+
+      logInfo.textContent = `${getTotalSampleCount()} samples`;
       addChartPoint(varId, value);
     }
 
@@ -886,7 +934,7 @@
         }
 
         const crcReceived = frame[frame.length - 2];
-        const crcComputed = computeCRC(frame, 1, frame.length - 3);
+        const crcComputed = computeCRC(frame, 1, 1 + lenField);
         if (PROTOCOL.useCRC && crcReceived !== crcComputed) {
           console.warn("CRC mismatch");
           continue;
@@ -940,18 +988,26 @@
         const vDef = getVarById(field.varId);
         if (!vDef) return;
 
-        const start = field.startByte;
-        const len   = field.length;
-        const end   = start + len;
-        if (start < 0 || end > dataBytes.length) return;
+        let value = null;
 
-        const slice = dataBytes.slice(start, end);
-        const endianness = field.endianness || "lsbFirst";
+        if (field.formula) {
+          // Formula-based decoding, ignore startByte/length/endianness
+          value = evaluateNotifyFormula(field.formula, dataBytes);
+        } else {
+          // Legacy byte-based decoding
+          const start = field.startByte ?? 0;
+          const len   = field.length    ?? 2;
+          const end   = start + len;
+          if (start < 0 || end > dataBytes.length) return;
 
-        const value = decodeValueBytes(vDef, slice, endianness);
+          const slice = dataBytes.slice(start, end);
+          const endianness = field.endianness || "lsbFirst";
+          value = decodeValueBytes(vDef, slice, endianness);
+        }
+
         if (value === null || value === undefined) return;
 
-        applyDecodedValue("NOTIFY", vDef.id, value);
+        applyDecodedValue("NOTIFY", vDef.id, value, { notifyId });
       });
     }
 
@@ -980,7 +1036,7 @@
     };
 
     /************************************************************
-     * TOOLS & LOG DOWNLOAD
+     * TOOLS & CSV DOWNLOAD
      ************************************************************/
     clearRxBtn.onclick = () => {
       rxLog.value = "";
@@ -988,7 +1044,8 @@
     };
 
     clearValueLogBtn.onclick = () => {
-      valueLog.length = 0;
+      readWriteLog.length = 0;
+      notifyLogs.clear();
       logInfo.textContent = "0 samples";
     };
 
@@ -1006,26 +1063,55 @@
     };
 
     downloadLogBtn.onclick = () => {
-      if (!valueLog.length) {
+      const total = getTotalSampleCount();
+      if (!total) {
         alert("No data logged yet");
         return;
       }
-      let lines = ["time,kind,varId,name,value,unit"];
-      valueLog.forEach(s => {
-        lines.push(
-          `${s.time},${s.kind},0x${s.varId.toString(16)},${JSON.stringify(s.name)},${s.value},${JSON.stringify(s.unit || "")}`
-        );
-      });
-      const blob = new Blob([lines.join("\n")], { type: "text/plain;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
+
       const ts = new Date().toISOString().replace(/[:.]/g, "-");
-      a.href = url;
-      a.download = `device_values_${ts}.txt`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+
+      // 1) Read/Write CSV
+      if (readWriteLog.length) {
+        let lines = ["time,kind,varId,name,value,unit"];
+        readWriteLog.forEach(s => {
+          lines.push(
+            `${s.time},${s.kind},0x${s.varId.toString(16)},${JSON.stringify(s.name)},${s.value},${JSON.stringify(s.unit || "")}`
+          );
+        });
+
+        const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `read_write_log_${ts}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+
+      // 2) One CSV per notify channel
+      notifyLogs.forEach((entries, notifyId) => {
+        if (!entries.length) return;
+
+        let lines = ["time,notifyId,varId,name,value,unit"];
+        entries.forEach(s => {
+          lines.push(
+            `${s.time},${notifyId},0x${s.varId.toString(16)},${JSON.stringify(s.name)},${s.value},${JSON.stringify(s.unit || "")}`
+          );
+        });
+
+        const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `notify_${notifyId}_log_${ts}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      });
     };
   </script>
 </body>

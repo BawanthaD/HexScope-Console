@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Device Console</title>
+  <title>HexScope Console</title>
   <style>
     :root {
       --bg-body: #020617;
@@ -261,7 +261,7 @@
     <div class="topbar-left">
       <div class="app-logo"></div>
       <div>
-        <div class="app-title">Device Console</div>
+        <div class="app-title">HexScope Console</div>
         <div class="topbar-subtitle">
           Hex protocol · Flexible notify · Multi Read/Write · Plot & CSV
         </div>
@@ -396,16 +396,21 @@
     let VARIABLE_DB = [];
     let NOTIFY_CONFIG = [];
 
-    // Read/Write logs
-    const readWriteLog = []; // {time, kind, varId, name, value, unit}
+    // Read/Write logs (per frame)
+    // Each entry: { time, kind, values: { [varId]: {name, value, unit} } }
+    const readWriteLog = [];
 
-    // Notify logs: notifyId -> [{time, varId, name, value, unit}]
+    // Notify logs (per frame): notifyId -> [ { time, values: { [varId]: value } } ]
     const notifyLogs = new Map();
 
     function getTotalSampleCount() {
       let total = readWriteLog.length;
       notifyLogs.forEach(arr => { total += arr.length; });
       return total;
+    }
+
+    function updateSampleCount() {
+      logInfo.textContent = `${getTotalSampleCount()} samples`;
     }
 
     // Latest values: varId -> { value, unit, time }
@@ -655,6 +660,7 @@
       return null;
     }
 
+    // Only updates UI + chart. Logging is done by frame handlers.
     function applyDecodedValue(kind, varId, value, meta = {}) {
       const v = getVarById(varId);
       if (!v) return;
@@ -663,34 +669,6 @@
       const slot = document.getElementById(`latest-${varId}`);
       if (slot) slot.textContent = `${value} ${unit}`;
 
-      const time = new Date().toISOString();
-
-      if (kind === "READ" || kind === "WRITE") {
-        readWriteLog.push({
-          time,
-          kind,
-          varId,
-          name: v.name,
-          value,
-          unit
-        });
-      } else if (kind === "NOTIFY") {
-        const notifyId = meta.notifyId;
-        if (notifyId != null) {
-          if (!notifyLogs.has(notifyId)) {
-            notifyLogs.set(notifyId, []);
-          }
-          notifyLogs.get(notifyId).push({
-            time,
-            varId,
-            name: v.name,
-            value,
-            unit
-          });
-        }
-      }
-
-      logInfo.textContent = `${getTotalSampleCount()} samples`;
       addChartPoint(varId, value);
     }
 
@@ -1042,7 +1020,23 @@
       const value = decodeValueBytes(vDef, dataBytes, "lsbFirst");
       if (value === null || value === undefined) return;
 
+      // UI + chart
       applyDecodedValue("READ", varId, value);
+
+      // Log as one-frame row (even if only one var)
+      const time = new Date().toISOString();
+      const values = {};
+      values[String(varId)] = {
+        name: vDef.name,
+        value,
+        unit: vDef.unit || ""
+      };
+      readWriteLog.push({
+        time,
+        kind: "READ",
+        values
+      });
+      updateSampleCount();
     }
 
     // NOTIFY_DATA: [notifyId, data...]
@@ -1055,6 +1049,9 @@
 
       const cfg = getNotifyCaseById(notifyId);
       if (!cfg || !cfg.variables) return;
+
+      const time = new Date().toISOString();
+      const rowValues = {}; // varId(string) -> value
 
       cfg.variables.forEach(field => {
         const vDef = getVarById(field.varId);
@@ -1079,8 +1076,24 @@
 
         if (value === null || value === undefined) return;
 
+        // UI + chart
         applyDecodedValue("NOTIFY", vDef.id, value, { notifyId });
+
+        // Log into this frame row
+        rowValues[String(vDef.id)] = value;
       });
+
+      if (Object.keys(rowValues).length === 0) return;
+
+      if (!notifyLogs.has(notifyId)) {
+        notifyLogs.set(notifyId, []);
+      }
+      notifyLogs.get(notifyId).push({
+        time,
+        values: rowValues
+      });
+
+      updateSampleCount();
     }
 
     /************************************************************
@@ -1102,8 +1115,23 @@
       const payload = [v.id, ...dataBytes];
       await sendFrame(buildFrame(CMD_WRITE_VAR, payload));
 
-      // Optionally log write as an event (without waiting for read-back)
+      // UI + chart
       applyDecodedValue("WRITE", v.id, val);
+
+      // Log as a frame with one var
+      const time = new Date().toISOString();
+      const values = {};
+      values[String(v.id)] = {
+        name: v.name,
+        value: val,
+        unit: v.unit || ""
+      };
+      readWriteLog.push({
+        time,
+        kind: "WRITE",
+        values
+      });
+      updateSampleCount();
     }
 
     readAllBtn.onclick = async () => {
@@ -1123,7 +1151,7 @@
     clearValueLogBtn.onclick = () => {
       readWriteLog.length = 0;
       notifyLogs.clear();
-      logInfo.textContent = "0 samples";
+      updateSampleCount();
     };
 
     clearChartBtn.onclick = () => {
@@ -1148,13 +1176,21 @@
 
       const ts = new Date().toISOString().replace(/[:.]/g, "-");
 
-      // 1) Read/Write CSV
+      // 1) Read/Write CSV (wide format: columns per variable)
       if (readWriteLog.length) {
-        let lines = ["time,kind,varId,name,value,unit"];
-        readWriteLog.forEach(s => {
-          lines.push(
-            `${s.time},${s.kind},0x${s.varId.toString(16)},${JSON.stringify(s.name)},${s.value},${JSON.stringify(s.unit || "")}`
-          );
+        // Column order: time, kind, then one column per VARIABLE_DB
+        const headers = ["time", "kind", ...VARIABLE_DB.map(v => JSON.stringify(v.name))];
+        const lines = [headers.join(",")];
+
+        readWriteLog.forEach(entry => {
+          const row = [];
+          row.push(entry.time);
+          row.push(entry.kind);
+          VARIABLE_DB.forEach(v => {
+            const valObj = entry.values[String(v.id)];
+            row.push(valObj ? valObj.value : "");
+          });
+          lines.push(row.join(","));
         });
 
         const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
@@ -1168,15 +1204,36 @@
         URL.revokeObjectURL(url);
       }
 
-      // 2) One CSV per notify channel
+      // 2) One CSV per notify channel (wide format: one row per frame, columns per var)
       notifyLogs.forEach((entries, notifyId) => {
         if (!entries.length) return;
 
-        let lines = ["time,notifyId,varId,name,value,unit"];
-        entries.forEach(s => {
-          lines.push(
-            `${s.time},${notifyId},0x${s.varId.toString(16)},${JSON.stringify(s.name)},${s.value},${JSON.stringify(s.unit || "")}`
-          );
+        const cfg = getNotifyCaseById(notifyId);
+        if (!cfg || !cfg.variables) return;
+
+        // Column definitions
+        const colDefs = cfg.variables.map(field => {
+          const vDef = getVarById(field.varId);
+          const baseName = field.nameOverride || (vDef ? vDef.name : `Var ${field.varId}`);
+          return {
+            varId: field.varId,
+            key: String(field.varId),
+            label: baseName
+          };
+        });
+
+        const headers = ["time", "notifyId", ...colDefs.map(c => JSON.stringify(c.label))];
+        const lines = [headers.join(",")];
+
+        entries.forEach(entry => {
+          const row = [];
+          row.push(entry.time);
+          row.push(notifyId);
+          colDefs.forEach(c => {
+            const v = entry.values[c.key];
+            row.push(v !== undefined ? v : "");
+          });
+          lines.push(row.join(","));
         });
 
         const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });

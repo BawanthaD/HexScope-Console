@@ -136,12 +136,12 @@
       <button id="disconnectBtn" disabled>Disconnect</button>
     </div>
     <div class="small">
-      Works in Chrome / Edge using Web Serial. Click “Connect” to choose a COM port.
+      Use Chrome / Edge with Web Serial. Serve this as http://localhost/... (not file://).
     </div>
   </div>
 
   <div class="grid">
-    <!-- Left side: Controls + Decoded + Graph -->
+    <!-- Left side: controls + graph + decoded -->
     <div>
       <!-- Variable controls -->
       <div class="panel">
@@ -160,23 +160,23 @@
         </div>
         <div class="row">
           <button id="notifyStartBtn" disabled>Start notify</button>
-          <button id="notifyStopBtn" disabled>Stop notify</button>
+          <button id="notifyStopBtn" disabled>Stop notify (selected)</button>
         </div>
         <div class="small">
-          Notify: ESP32 sends the selected variable value every 1s until “Stop notify”.
+          Click <b>Start notify</b> for each variable you want to stream.<br>
+          <b>Stop notify</b> sends NOTIFY_STOP for the currently selected variable.
         </div>
       </div>
 
       <!-- Graph panel -->
       <div class="panel">
         <h2>Live Plot</h2>
-        <div class="row">
-          <label for="plotVarSelect">Plot variable:</label>
-          <select id="plotVarSelect"></select>
+        <div class="row" id="plotVarContainer">
+          <!-- checkboxes populated by JS -->
         </div>
         <canvas id="dataChart" height="200"></canvas>
         <div class="small">
-          The graph updates on incoming data (NOTIFY_DATA / READ_RESPONSE) for the selected variable.
+          Each variable is its own trace (x = time, y = value). Checkboxes show/hide traces.
         </div>
       </div>
 
@@ -352,8 +352,8 @@
           raw: rawFrame
         });
 
-        // Feed the graph
-        maybeAddChartPoint(varId, value);
+        // Feed the graph for every sample
+        addChartPoint(varId, value);
       } else {
         addDecodedItem({
           type: 'UNKNOWN',
@@ -378,28 +378,44 @@
     const clearRxBtn    = document.getElementById('clearRxBtn');
 
     const varSelect       = document.getElementById('varSelect');
-    const plotVarSelect   = document.getElementById('plotVarSelect');
     const readVarBtn      = document.getElementById('readVarBtn');
     const writeVarBtn     = document.getElementById('writeVarBtn');
     const notifyStartBtn  = document.getElementById('notifyStartBtn');
     const notifyStopBtn   = document.getElementById('notifyStopBtn');
     const writeValue      = document.getElementById('writeValue');
     const decodedList     = document.getElementById('decodedList');
+    const plotVarContainer= document.getElementById('plotVarContainer');
 
-    function initVariableDropdowns() {
-      for (const v of VARIABLE_DB) {
-        const opt1 = document.createElement('option');
-        opt1.value = v.name;
-        opt1.textContent = `${v.name} (0x${v.id.toString(16)})`;
-        varSelect.appendChild(opt1);
+    function initVariableDropdownsAndCheckboxes() {
+      VARIABLE_DB.forEach((v, idx) => {
+        // Control dropdown
+        const opt = document.createElement('option');
+        opt.value = v.name;
+        opt.textContent = `${v.name} (0x${v.id.toString(16)})`;
+        varSelect.appendChild(opt);
 
-        const opt2 = document.createElement('option');
-        opt2.value = v.name;
-        opt2.textContent = `${v.name} (0x${v.id.toString(16)})`;
-        plotVarSelect.appendChild(opt2);
-      }
+        // Plot checkbox
+        const label = document.createElement('label');
+        label.style.display = 'flex';
+        label.style.alignItems = 'center';
+        label.style.gap = '4px';
+
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = (idx === 0); // show first by default
+        cb.dataset.varId = v.id;
+
+        cb.addEventListener('change', () => {
+          onPlotCheckboxChanged(v.id, cb.checked);
+        });
+
+        label.appendChild(cb);
+        label.appendChild(document.createTextNode(v.name));
+        plotVarContainer.appendChild(label);
+      });
     }
-    initVariableDropdowns();
+
+    initVariableDropdownsAndCheckboxes();
 
     function setConnectedState(isConnected, info = '') {
       if (isConnected) {
@@ -598,31 +614,37 @@
     notifyStopBtn.addEventListener('click', onNotifyStop);
 
     /************************************************************
-     *  Chart handling
+     *  Chart handling – multiple datasets, scatter-style
      ************************************************************/
     const chartCtx = document.getElementById('dataChart').getContext('2d');
-    let currentPlotVarId = VARIABLE_DB[0].id;
-    const MAX_POINTS = 100;
+    const MAX_POINTS = 300;
+
+    const t0 = performance.now(); // reference time
+
+    // One dataset per variable, using {x,y} points
+    const datasets = VARIABLE_DB.map((v, idx) => ({
+      label: v.name,
+      data: [],
+      borderWidth: 1,
+      tension: 0.1,
+      pointRadius: 0,
+      varId: v.id,
+      hidden: idx !== 0,  // show first by default
+      parsing: false      // we provide {x,y}
+    }));
 
     const dataChart = new Chart(chartCtx, {
       type: 'line',
       data: {
-        labels: [],
-        datasets: [{
-          label: VARIABLE_DB[0].name,
-          data: [],
-          borderWidth: 1,
-          tension: 0.1,
-          pointRadius: 0
-        }]
+        datasets: datasets
       },
       options: {
         animation: false,
         responsive: true,
         scales: {
           x: {
-            title: { display: true, text: 'Time' },
-            ticks: { autoSkip: true, maxTicksLimit: 10 }
+            type: 'linear',
+            title: { display: true, text: 'Time (s)' }
           },
           y: {
             title: { display: true, text: 'Value' }
@@ -634,39 +656,26 @@
       }
     });
 
-    function onPlotVarChanged() {
-      const varName = plotVarSelect.value;
-      const v = getVarByName(varName);
-      if (!v) return;
-      currentPlotVarId = v.id;
-
-      // Reset chart data for new variable
-      dataChart.data.labels = [];
-      dataChart.data.datasets[0].data = [];
-      dataChart.data.datasets[0].label = v.name;
+    function onPlotCheckboxChanged(varId, isChecked) {
+      const ds = dataChart.data.datasets.find(d => d.varId === varId);
+      if (!ds) return;
+      ds.hidden = !isChecked;
       dataChart.update();
     }
 
-    plotVarSelect.addEventListener('change', onPlotVarChanged);
+    function addChartPoint(varId, value) {
+      const tNow = (performance.now() - t0) / 1000.0; // seconds since page load
 
-    function maybeAddChartPoint(varId, value) {
-      if (varId !== currentPlotVarId) return;
+      const ds = dataChart.data.datasets.find(d => d.varId === varId);
+      if (!ds) return;
 
-      const now = new Date();
-      const label = now.toLocaleTimeString();
+      ds.data.push({ x: tNow, y: value });
 
-      const labels = dataChart.data.labels;
-      const dataset = dataChart.data.datasets[0].data;
-
-      labels.push(label);
-      dataset.push(value);
-
-      if (labels.length > MAX_POINTS) {
-        labels.shift();
-        dataset.shift();
+      if (ds.data.length > MAX_POINTS) {
+        ds.data.shift();
       }
 
-      dataChart.update('none'); // no animation
+      dataChart.update('none'); // no animation → smooth streaming
     }
   </script>
 </body>

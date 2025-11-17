@@ -4,202 +4,558 @@
   <meta charset="UTF-8">
   <title>Device Console</title>
   <style>
-    body {
-      font-family: system-ui, sans-serif;
-      background: #020617;
-      color: #e5e7eb;
+    :root {
+      --bg-body: #020617;        /* page background */
+      --bg-surface: #0f172a;     /* card background */
+      --bg-surface-soft: #020617;
+      --border-subtle: rgba(148, 163, 184, 0.1);
+      --accent: #3b82f6;
+      --accent-soft: rgba(59, 130, 246, 0.15);
+      --danger: #ef4444;
+      --text-primary: #e5e7eb;
+      --text-muted: #94a3b8;
+      --radius-lg: 12px;
+      --radius-sm: 6px;
+      --shadow-soft: 0 18px 40px rgba(15, 23, 42, 0.65);
+      --input-bg: #020617;
+      --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+                   "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
       margin: 0;
-      padding: 16px;
+      padding: 0;
+      height: 100%;
     }
-    h1 {
-      margin-top: 0;
-      font-size: 1.4rem;
+
+    body {
+      font-family: var(--font-sans);
+      background: radial-gradient(circle at top, #0b1120 0, #020617 45%, #020617 100%);
+      color: var(--text-primary);
+      padding: 0;
     }
+
+    /* Top bar -------------------------------------------------- */
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      backdrop-filter: blur(12px);
+      background: linear-gradient(
+        to bottom,
+        rgba(15, 23, 42, 0.92),
+        rgba(15, 23, 42, 0.85),
+        rgba(15, 23, 42, 0.7)
+      );
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .topbar-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .app-logo {
+      width: 26px;
+      height: 26px;
+      border-radius: 8px;
+      background: radial-gradient(circle at 30% 20%, #38bdf8, #1d4ed8 55%, #020617 90%);
+      box-shadow: 0 0 18px rgba(59, 130, 246, 0.7);
+    }
+
+    .app-title {
+      font-size: 1.15rem;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+    }
+
+    .topbar-subtitle {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid var(--border-subtle);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--danger);
+      box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.8);
+    }
+
+    .status-dot.connected {
+      background: #22c55e;
+      box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.8),
+                  0 0 10px rgba(34, 197, 94, 0.65);
+    }
+
+    .status-text {
+      color: var(--text-muted);
+    }
+
+    .status-text strong {
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+
+    /* Controls in header */
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+    }
+
+    .header-controls label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .select-compact {
+      background: var(--input-bg);
+      border: 1px solid var(--border-subtle);
+      border-radius: 999px;
+      color: var(--text-primary);
+      padding: 4px 10px;
+      font-size: 0.8rem;
+      outline: none;
+    }
+
+    .btn {
+      border: none;
+      border-radius: 999px;
+      padding: 6px 14px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.16s ease, box-shadow 0.16s ease, transform 0.08s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      box-shadow: none;
+      transform: none;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: white;
+      box-shadow: 0 10px 25px rgba(37, 99, 235, 0.5);
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: #2563eb;
+      box-shadow: 0 14px 30px rgba(37, 99, 235, 0.7);
+      transform: translateY(-1px);
+    }
+
+    .btn-outline {
+      background: transparent;
+      border: 1px solid var(--border-subtle);
+      color: var(--text-primary);
+    }
+
+    .btn-outline:hover:not(:disabled) {
+      background: rgba(148, 163, 184, 0.12);
+    }
+
+    .btn-danger {
+      background: #b91c1c;
+      color: white;
+      box-shadow: 0 10px 25px rgba(185, 28, 28, 0.5);
+    }
+
+    .btn-danger:hover:not(:disabled) {
+      background: #dc2626;
+      box-shadow: 0 14px 30px rgba(239, 68, 68, 0.7);
+      transform: translateY(-1px);
+    }
+
+    /* Main layout --------------------------------------------- */
+    .page {
+      padding: 16px 24px 32px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
     .grid {
       display: grid;
-      grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+      grid-template-columns: minmax(0, 1.5fr) minmax(0, 2fr);
+      gap: 20px;
+      margin-top: 16px;
+    }
+
+    .column {
+      display: flex;
+      flex-direction: column;
       gap: 16px;
     }
+
+    /* Cards / panels ------------------------------------------ */
     .panel {
-      border: 1px solid #374151;
-      border-radius: 8px;
-      padding: 12px 16px;
-      background: #020617;
-      margin-bottom: 16px;
+      background: radial-gradient(circle at top left, #111827, #020617);
+      border-radius: var(--radius-lg);
+      padding: 18px 18px 16px;
+      border: 1px solid var(--border-subtle);
+      box-shadow: var(--shadow-soft);
+      position: relative;
+      overflow: hidden;
     }
-    .panel h2 {
-      margin: 0 0 8px 0;
+
+    .panel::before {
+      content: "";
+      position: absolute;
+      inset: -40px;
+      background: radial-gradient(circle at top right,
+        rgba(59, 130, 246, 0.17), transparent 55%);
+      opacity: 0.7;
+      pointer-events: none;
+    }
+
+    .panel-inner {
+      position: relative;
+      z-index: 1;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .panel-title {
       font-size: 1rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
     }
+
+    .panel-caption {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
     .row {
       display: flex;
       flex-wrap: wrap;
-      gap: 8px;
+      gap: 10px;
       align-items: center;
       margin-bottom: 8px;
     }
+
     label {
-      font-size: 0.9rem;
-      margin-right: 4px;
+      font-size: 0.85rem;
+      color: var(--text-muted);
     }
-    select, input, button {
-      background: #020617;
-      color: #e5e7eb;
-      border: 1px solid #4b5563;
-      border-radius: 4px;
-      padding: 4px 8px;
-      font-size: 0.9rem;
-      font-family: inherit;
+
+    select, input[type="number"] {
+      background: var(--input-bg);
+      color: var(--text-primary);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 6px 10px;
+      font-size: 0.85rem;
+      outline: none;
+      min-width: 80px;
     }
-    button {
-      cursor: pointer;
+
+    select:focus, input[type="number"]:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.4);
     }
-    button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
+
+    input[type="number"]::-webkit-outer-spin-button,
+    input[type="number"]::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
     }
+
     textarea {
       width: 100%;
       height: 200px;
       resize: vertical;
-      font-family: monospace;
-      font-size: 0.8rem;
-      line-height: 1.3;
-      background: #020617;
-      color: #e5e7eb;
-      border: 1px solid #4b5563;
-      border-radius: 4px;
-      padding: 6px;
-    }
-    .status-dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      display: inline-block;
-      margin-right: 4px;
-      background: #ef4444;
-    }
-    .status-dot.connected {
-      background: #22c55e;
-    }
-    .small {
-      font-size: 0.8rem;
-      color: #9ca3af;
-    }
-    .pill {
-      display: inline-block;
-      padding: 2px 6px;
-      border-radius: 999px;
+      font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
       font-size: 0.75rem;
-      background: #111827;
-      border: 1px solid #4b5563;
-      margin-right: 4px;
-    }
-    .decoded-item {
-      font-size: 0.85rem;
-      border-bottom: 1px solid #1f2937;
-      padding: 4px 0;
-    }
-    canvas {
+      line-height: 1.4;
       background: #020617;
+      color: var(--text-primary);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 8px;
+    }
+
+    .small {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      background: #020617;
+      border: 1px solid var(--border-subtle);
+      color: var(--text-muted);
+      margin-right: 6px;
+    }
+
+    .decoded-item {
+      font-size: 0.78rem;
+      border-bottom: 1px dashed rgba(148, 163, 184, 0.22);
+      padding: 6px 0;
+    }
+
+    .decoded-item:last-child {
+      border-bottom: none;
+    }
+
+    .decoded-label {
+      font-weight: 500;
+      color: #e5e7eb;
+    }
+
+    .decoded-raw {
+      color: var(--text-muted);
+    }
+
+    canvas {
+      background: var(--bg-surface-soft);
+      border-radius: 8px;
+    }
+
+    .checkbox-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .checkbox-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid var(--border-subtle);
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+
+    .checkbox-pill input {
+      accent-color: var(--accent);
+      transform: scale(1.05);
+      cursor: pointer;
+    }
+
+    .panel-footer-text {
+      margin-top: 6px;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .muted-mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+    }
+
+    @media (max-width: 960px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+      .topbar {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+      }
+      .topbar-right {
+        width: 100%;
+        justify-content: space-between;
+      }
     }
   </style>
 </head>
 <body>
-  <h1>Device Console (Browser + Web Serial)</h1>
+  <!-- Top bar -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <div class="app-logo"></div>
+      <div>
+        <div class="app-title">Device Console</div>
+        <div class="topbar-subtitle">Browser + Web Serial debugger</div>
+      </div>
+    </div>
+
+    <div class="topbar-right">
+      <div class="status-pill">
+        <span class="status-dot" id="statusDot"></span>
+        <span class="status-text" id="statusText">
+          <strong>Disconnected</strong>
+        </span>
+      </div>
+
+      <div class="header-controls">
+        <label for="baudRate">Baud</label>
+        <select id="baudRate" class="select-compact">
+          <option value="9600">9600</option>
+          <option value="19200">19200</option>
+          <option value="38400">38400</option>
+          <option value="57600">57600</option>
+          <option value="115200" selected>115200</option>
+          <option value="230400">230400</option>
+          <option value="460800">460800</option>
+          <option value="921600">921600</option>
+        </select>
+
+        <button id="connectBtn" class="btn btn-primary">Connect</button>
+        <button id="disconnectBtn" class="btn btn-outline btn-danger" disabled>Disconnect</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main content -->
+  <main class="page">
+    <div class="grid">
+      <!-- Left column: controls + decoded -->
+      <section class="column">
+        <!-- Variables panel -->
+        <div class="panel">
+          <div class="panel-inner">
+            <div class="panel-header">
+              <div>
+                <div class="panel-title">Variables</div>
+                <div class="panel-caption">High-level read / write / notify</div>
+              </div>
+            </div>
+
+            <div class="row">
+              <label for="varSelect">Variable</label>
+              <select id="varSelect"></select>
+            </div>
+
+            <div class="row">
+              <button id="readVarBtn" class="btn btn-outline" disabled>Read</button>
+            </div>
+
+            <div class="row">
+              <label for="writeValue">Write value</label>
+              <input type="number" id="writeValue" style="width: 110px;">
+              <button id="writeVarBtn" class="btn btn-outline" disabled>Write</button>
+            </div>
+
+            <div class="row">
+              <button id="notifyStartBtn" class="btn btn-primary" disabled>Start notify</button>
+              <button id="notifyStopBtn" class="btn btn-outline" disabled>Stop notify</button>
+            </div>
+
+            <div class="panel-footer-text">
+              <strong>Notify</strong> subscribes the ESP32 to stream this variable every second
+              until you send a stop command for that variable.
+            </div>
+          </div>
+        </div>
+
+        <!-- Decoded frames -->
+        <div class="panel">
+          <div class="panel-inner">
+            <div class="panel-header">
+              <div>
+                <div class="panel-title">Decoded Frames</div>
+                <div class="panel-caption">Protocol-level view of incoming packets</div>
+              </div>
+            </div>
+
+            <div id="decodedList" class="small">
+              <!-- Filled by JS -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right column: chart + raw log -->
+      <section class="column">
+        <!-- Live plot -->
+        <div class="panel">
+          <div class="panel-inner">
+            <div class="panel-header">
+              <div>
+                <div class="panel-title">Live Plot</div>
+                <div class="panel-caption">Visualize streaming values over time</div>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="checkbox-group" id="plotVarContainer">
+                <!-- checkboxes populated by JS -->
+              </div>
+            </div>
+
+            <canvas id="dataChart" height="220"></canvas>
+
+            <div class="panel-footer-text">
+              Each variable is its own trace (<span class="muted-mono">x = time, y = value</span>).
+              Use the toggles above to show or hide individual variables.
+            </div>
+          </div>
+        </div>
+
+        <!-- Raw RX log -->
+        <div class="panel">
+          <div class="panel-inner">
+            <div class="panel-header">
+              <div>
+                <div class="panel-title">Raw RX (hex)</div>
+                <div class="panel-caption">Exact bytes received on the serial line</div>
+              </div>
+              <button id="clearRxBtn" class="btn btn-outline" style="font-size:0.75rem;">Clear</button>
+            </div>
+
+            <textarea id="rxLog" readonly></textarea>
+
+            <div class="panel-footer-text">
+              Data format:
+              <span class="muted-mono">SOF | LEN | TYPE | PAYLOAD | CRC | EOF</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
 
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-  <!-- Connection -->
-  <div class="panel">
-    <div class="row">
-      <span id="status">
-        <span class="status-dot" id="statusDot"></span>
-        <span id="statusText">Disconnected</span>
-      </span>
-    </div>
-    <div class="row">
-      <label for="baudRate">Baud rate:</label>
-      <select id="baudRate">
-        <option value="9600">9600</option>
-        <option value="19200">19200</option>
-        <option value="38400">38400</option>
-        <option value="57600">57600</option>
-        <option value="115200" selected>115200</option>
-        <option value="230400">230400</option>
-        <option value="460800">460800</option>
-        <option value="921600">921600</option>
-      </select>
-
-      <button id="connectBtn">Connect</button>
-      <button id="disconnectBtn" disabled>Disconnect</button>
-    </div>
-    <div class="small">
-      Use Chrome / Edge with Web Serial. Serve this as http://localhost/... (not file://).
-    </div>
-  </div>
-
-  <div class="grid">
-    <!-- Left side: controls + graph + decoded -->
-    <div>
-      <!-- Variable controls -->
-      <div class="panel">
-        <h2>Variables</h2>
-        <div class="row">
-          <label for="varSelect">Variable:</label>
-          <select id="varSelect"></select>
-        </div>
-        <div class="row">
-          <button id="readVarBtn" disabled>Read variable</button>
-        </div>
-        <div class="row">
-          <label for="writeValue">Write value:</label>
-          <input type="number" id="writeValue" style="width: 120px;">
-          <button id="writeVarBtn" disabled>Write variable</button>
-        </div>
-        <div class="row">
-          <button id="notifyStartBtn" disabled>Start notify</button>
-          <button id="notifyStopBtn" disabled>Stop notify (selected)</button>
-        </div>
-        <div class="small">
-          Click <b>Start notify</b> for each variable you want to stream.<br>
-          <b>Stop notify</b> sends NOTIFY_STOP for the currently selected variable.
-        </div>
-      </div>
-
-      <!-- Graph panel -->
-      <div class="panel">
-        <h2>Live Plot</h2>
-        <div class="row" id="plotVarContainer">
-          <!-- checkboxes populated by JS -->
-        </div>
-        <canvas id="dataChart" height="200"></canvas>
-        <div class="small">
-          Each variable is its own trace (x = time, y = value). Checkboxes show/hide traces.
-        </div>
-      </div>
-
-      <!-- Decoded frames -->
-      <div class="panel">
-        <h2>Decoded Frames</h2>
-        <div id="decodedList" class="small">
-          <!-- populated by JS -->
-        </div>
-      </div>
-    </div>
-
-    <!-- Right side: Raw logs -->
-    <div>
-      <div class="panel">
-        <div class="row">
-          <h2 style="margin:0;">Raw RX (hex)</h2>
-          <button id="clearRxBtn" style="margin-left:auto;">Clear</button>
-        </div>
-        <textarea id="rxLog" readonly></textarea>
-      </div>
-    </div>
-  </div>
 
   <script>
     /************************************************************
@@ -216,7 +572,7 @@
     const CMD_READ_RESPONSE  = 0x81;
     const CMD_NOTIFY_DATA    = 0x82;
 
-    // Example variable database
+    // Variable database
     const VARIABLE_DB = [
       { id: 0x10, name: 'Temperature', type: 'int16', unit: '°C' },
       { id: 0x11, name: 'Pressure',    type: 'int16', unit: 'kPa' },
@@ -241,9 +597,8 @@
     }
 
     // Build frame: SOF | LEN | TYPE | PAYLOAD... | CRC | EOF
-    // LEN = TYPE + PAYLOAD length
     function buildFrame(type, payloadBytes) {
-      const len = 1 + payloadBytes.length;
+      const len = 1 + payloadBytes.length;           // TYPE + PAYLOAD
       const frameLen = 1 + 1 + len + 1 + 1;
       const frame = new Uint8Array(frameLen);
 
@@ -352,7 +707,6 @@
           raw: rawFrame
         });
 
-        // Feed the graph for every sample
         addChartPoint(varId, value);
       } else {
         addDecodedItem({
@@ -388,17 +742,13 @@
 
     function initVariableDropdownsAndCheckboxes() {
       VARIABLE_DB.forEach((v, idx) => {
-        // Control dropdown
         const opt = document.createElement('option');
         opt.value = v.name;
         opt.textContent = `${v.name} (0x${v.id.toString(16)})`;
         varSelect.appendChild(opt);
 
-        // Plot checkbox
         const label = document.createElement('label');
-        label.style.display = 'flex';
-        label.style.alignItems = 'center';
-        label.style.gap = '4px';
+        label.className = 'checkbox-pill';
 
         const cb = document.createElement('input');
         cb.type = 'checkbox';
@@ -420,7 +770,7 @@
     function setConnectedState(isConnected, info = '') {
       if (isConnected) {
         statusDot.classList.add('connected');
-        statusText.textContent = 'Connected ' + info;
+        statusText.innerHTML = `<strong>Connected</strong> <span style="color:#94a3b8;">${info}</span>`;
         connectBtn.disabled = true;
         disconnectBtn.disabled = false;
         readVarBtn.disabled = false;
@@ -429,7 +779,7 @@
         notifyStopBtn.disabled = false;
       } else {
         statusDot.classList.remove('connected');
-        statusText.textContent = 'Disconnected';
+        statusText.innerHTML = `<strong>Disconnected</strong>`;
         connectBtn.disabled = false;
         disconnectBtn.disabled = true;
         readVarBtn.disabled = true;
@@ -455,26 +805,21 @@
         .map(b => b.toString(16).padStart(2, '0'))
         .join(' ');
 
-      if (info.type === 'READ_RESPONSE') {
+      if (info.type === 'READ_RESPONSE' || info.type === 'NOTIFY_DATA') {
+        const kindLabel = info.type === 'READ_RESPONSE' ? 'READ' : 'NOTIFY';
         div.innerHTML =
-          `<span class="pill">READ</span>` +
-          `<strong>${info.name}</strong> = ${info.value} ${info.unit} ` +
+          `<span class="pill">${kindLabel}</span>` +
+          `<span class="decoded-label">${info.name}</span> = ${info.value} ${info.unit} ` +
           `<span class="small">(varId=0x${info.varId.toString(16)})</span><br>` +
-          `<span class="small">raw: ${rawHex}</span>`;
-      } else if (info.type === 'NOTIFY_DATA') {
-        div.innerHTML =
-          `<span class="pill">NOTIFY</span>` +
-          `<strong>${info.name}</strong> = ${info.value} ${info.unit} ` +
-          `<span class="small">(varId=0x${info.varId.toString(16)})</span><br>` +
-          `<span class="small">raw: ${rawHex}</span>`;
+          `<span class="decoded-raw">raw: ${rawHex}</span>`;
       } else if (info.type === 'CRC_ERROR') {
         div.innerHTML =
           `<span class="pill">CRC ERROR</span> ` +
-          `<span class="small">raw: ${rawHex}</span>`;
+          `<span class="decoded-raw">raw: ${rawHex}</span>`;
       } else {
         div.innerHTML =
           `<span class="pill">${info.type}</span> ` +
-          `<span class="small">raw: ${rawHex}</span>`;
+          `<span class="decoded-raw">raw: ${rawHex}</span>`;
       }
 
       decodedList.prepend(div);
@@ -496,7 +841,7 @@
           flowControl: 'none'
         });
 
-        setConnectedState(true, `(baud ${baudRate})`);
+        setConnectedState(true, `baud ${baudRate}`);
         keepReading = true;
         readLoop();
       } catch (err) {
@@ -511,9 +856,7 @@
         if (reader) {
           try {
             await reader.cancel();
-          } catch (e) {
-            console.warn('Error cancelling reader:', e);
-          }
+          } catch (e) {}
           reader.releaseLock();
           reader = null;
         }
@@ -536,7 +879,7 @@
       reader = port.readable.getReader();
       try {
         while (keepReading) {
-          const { value, done } = await reader.read();
+        const { value, done } = await reader.read();
           if (done) break;
           if (value && value.length > 0) handleIncomingBytes(value);
         }
@@ -571,8 +914,7 @@
       const varName = varSelect.value;
       const v = getVarByName(varName);
       if (!v) return;
-      const frame = buildReadVarFrame(v.id);
-      await sendFrame(frame);
+      await sendFrame(buildReadVarFrame(v.id));
     }
 
     async function onWriteVariable() {
@@ -584,24 +926,21 @@
         alert('Enter a numeric value');
         return;
       }
-      const frame = buildWriteVarFrame(v.id, val);
-      await sendFrame(frame);
+      await sendFrame(buildWriteVarFrame(v.id, val));
     }
 
     async function onNotifyStart() {
       const varName = varSelect.value;
       const v = getVarByName(varName);
       if (!v) return;
-      const frame = buildNotifyStartFrame(v.id);
-      await sendFrame(frame);
+      await sendFrame(buildNotifyStartFrame(v.id));
     }
 
     async function onNotifyStop() {
       const varName = varSelect.value;
       const v = getVarByName(varName);
       if (!v) return;
-      const frame = buildNotifyStopFrame(v.id);
-      await sendFrame(frame);
+      await sendFrame(buildNotifyStopFrame(v.id));
     }
 
     connectBtn.addEventListener('click', connectSerial);
@@ -614,23 +953,21 @@
     notifyStopBtn.addEventListener('click', onNotifyStop);
 
     /************************************************************
-     *  Chart handling – multiple datasets, scatter-style
+     *  Chart handling – multi dataset, {x,y} points
      ************************************************************/
     const chartCtx = document.getElementById('dataChart').getContext('2d');
     const MAX_POINTS = 300;
+    const t0 = performance.now();
 
-    const t0 = performance.now(); // reference time
-
-    // One dataset per variable, using {x,y} points
     const datasets = VARIABLE_DB.map((v, idx) => ({
       label: v.name,
       data: [],
-      borderWidth: 1,
-      tension: 0.1,
+      borderWidth: 1.4,
+      tension: 0.18,
       pointRadius: 0,
       varId: v.id,
-      hidden: idx !== 0,  // show first by default
-      parsing: false      // we provide {x,y}
+      hidden: idx !== 0,
+      parsing: false
     }));
 
     const dataChart = new Chart(chartCtx, {
@@ -644,14 +981,24 @@
         scales: {
           x: {
             type: 'linear',
-            title: { display: true, text: 'Time (s)' }
+            title: { display: true, text: 'Time (s)' },
+            grid: { color: 'rgba(148, 163, 184, 0.15)' },
+            ticks: { color: '#94a3b8' }
           },
           y: {
-            title: { display: true, text: 'Value' }
+            title: { display: true, text: 'Value' },
+            grid: { color: 'rgba(148, 163, 184, 0.18)' },
+            ticks: { color: '#94a3b8' }
           }
         },
         plugins: {
-          legend: { display: true }
+          legend: {
+            display: true,
+            labels: {
+              color: '#e5e7eb',
+              font: { size: 11 }
+            }
+          }
         }
       }
     });
@@ -664,18 +1011,15 @@
     }
 
     function addChartPoint(varId, value) {
-      const tNow = (performance.now() - t0) / 1000.0; // seconds since page load
-
+      const tNow = (performance.now() - t0) / 1000.0;
       const ds = dataChart.data.datasets.find(d => d.varId === varId);
       if (!ds) return;
 
       ds.data.push({ x: tNow, y: value });
-
       if (ds.data.length > MAX_POINTS) {
         ds.data.shift();
       }
-
-      dataChart.update('none'); // no animation → smooth streaming
+      dataChart.update('none');
     }
   </script>
 </body>

@@ -214,6 +214,40 @@
       cursor: pointer;
     }
 
+    /* Variable rows for multi read/write */
+    .var-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 4px 0;
+      border-bottom: 1px dashed rgba(255,255,255,0.08);
+      font-size: 0.82rem;
+    }
+    .var-row:last-child {
+      border-bottom: none;
+    }
+    .var-row-left {
+      display: flex;
+      flex-direction: column;
+    }
+    .var-row-name {
+      font-size: 0.86rem;
+      font-weight: 500;
+    }
+    .var-row-meta {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+    .var-row-right {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .var-row-right input[type="number"] {
+      width: 90px;
+      font-size: 0.8rem;
+    }
+
     @media (max-width: 900px) {
       .grid {
         grid-template-columns: 1fr;
@@ -229,7 +263,7 @@
       <div>
         <div class="app-title">Device Console</div>
         <div class="topbar-subtitle">
-          Hex protocol · Flexible notify · Read/Write · Plot & CSV
+          Hex protocol · Flexible notify · Multi Read/Write · Plot & CSV
         </div>
       </div>
     </div>
@@ -258,22 +292,14 @@
         <div class="panel">
           <div class="panel-title">Variables</div>
           <div class="panel-caption">
-            Select a variable and perform read/write operations
+            Read/write multiple variables without re-selecting
           </div>
-          <div style="margin-bottom:10px;">
-            <label for="varSelect" style="font-size:0.85rem; color:var(--text-muted);">Variable</label><br>
-            <select id="varSelect" style="margin-top:4px; width:100%;"></select>
-          </div>
-          <div style="margin-bottom:10px;">
-            <button id="readVarBtn" class="btn btn-outline" disabled>Read</button>
-          </div>
-          <div>
-            <label for="writeValue" style="font-size:0.85rem; color:var(--text-muted);">Write value</label><br>
-            <input id="writeValue" type="number" style="margin-top:4px; width:120px;">
-            <button id="writeVarBtn" class="btn btn-outline" disabled>Write</button>
+          <div id="varTableContainer"></div>
+          <div style="margin-top:10px;">
+            <button id="readAllBtn" class="btn btn-outline" disabled>Read All</button>
           </div>
           <div style="margin-top:10px; font-size:0.78rem; color:var(--text-muted);">
-            Read/Write encoding (int16/int32/float32, scaling, signedness) is taken from
+            Read/Write encoding (int16/int32/float32, scaling, signedness) is defined in
             <code>variables.json</code>.
           </div>
         </div>
@@ -402,6 +428,10 @@
     const MAX_POINTS = 300;
     const t0 = performance.now();
 
+    // Variable row buttons
+    let varReadButtons = [];
+    let varWriteButtons = [];
+
     /************************************************************
      * DOM ELEMENTS
      ************************************************************/
@@ -411,16 +441,14 @@
     const connectBtn  = document.getElementById("connectBtn");
     const disconnectBtn = document.getElementById("disconnectBtn");
 
-    const varSelect   = document.getElementById("varSelect");
-    const readVarBtn  = document.getElementById("readVarBtn");
-    const writeVarBtn = document.getElementById("writeVarBtn");
-    const writeValue  = document.getElementById("writeValue");
+    const varTableContainer     = document.getElementById("varTableContainer");
+    const readAllBtn            = document.getElementById("readAllBtn");
 
-    const latestValuesContainer   = document.getElementById("latestValuesContainer");
-    const notifyListenContainer   = document.getElementById("notifyListenContainer");
-    const plotVarContainer        = document.getElementById("plotVarContainer");
-    const rxLog                   = document.getElementById("rxLog");
-    const logInfo                 = document.getElementById("logInfo");
+    const latestValuesContainer = document.getElementById("latestValuesContainer");
+    const notifyListenContainer = document.getElementById("notifyListenContainer");
+    const plotVarContainer      = document.getElementById("plotVarContainer");
+    const rxLog                 = document.getElementById("rxLog");
+    const logInfo               = document.getElementById("logInfo");
 
     const clearRxBtn        = document.getElementById("clearRxBtn");
     const clearValueLogBtn  = document.getElementById("clearValueLogBtn");
@@ -442,7 +470,7 @@
         const notifyJson = await notifyRes.json();
         NOTIFY_CONFIG = notifyJson.notifyCases || [];
 
-        initVariableDropdowns();
+        initVarTable();
         initLatestValuesUI();
         initNotifyUI();
         initChart();
@@ -471,16 +499,16 @@
         statusText.innerHTML = `<strong>Connected</strong> <span style="color:#94a3b8;">(${info})</span>`;
         connectBtn.disabled = true;
         disconnectBtn.disabled = false;
-        readVarBtn.disabled = false;
-        writeVarBtn.disabled = false;
       } else {
         statusDot.classList.remove("connected");
         statusText.innerHTML = `<strong>Disconnected</strong>`;
         connectBtn.disabled = false;
         disconnectBtn.disabled = true;
-        readVarBtn.disabled = true;
-        writeVarBtn.disabled = true;
       }
+
+      readAllBtn.disabled = !isConnected;
+      varReadButtons.forEach(btn => btn.disabled = !isConnected);
+      varWriteButtons.forEach(btn => btn.disabled = !isConnected);
     }
 
     function crcXor8(bytes, startIdx, endIdx) {
@@ -669,18 +697,67 @@
     /************************************************************
      * UI INIT
      ************************************************************/
-    function initVariableDropdowns() {
-      varSelect.innerHTML = "";
+    function initVarTable() {
+      varTableContainer.innerHTML = "";
+      varReadButtons = [];
+      varWriteButtons = [];
+
       VARIABLE_DB.forEach(v => {
-        const opt = document.createElement("option");
-        opt.value = v.id;
-        opt.textContent = `${v.name} (0x${v.id.toString(16)})`;
-        varSelect.appendChild(opt);
+        const row = document.createElement("div");
+        row.className = "var-row";
+
+        const left = document.createElement("div");
+        left.className = "var-row-left";
+
+        const name = document.createElement("div");
+        name.className = "var-row-name";
+        name.textContent = v.name;
+
+        const meta = document.createElement("div");
+        meta.className = "var-row-meta";
+        const unit = v.unit ? `, ${v.unit}` : "";
+        meta.textContent = `ID 0x${v.id.toString(16)} · ${v.format || "int16"}${unit}`;
+
+        left.appendChild(name);
+        left.appendChild(meta);
+
+        const right = document.createElement("div");
+        right.className = "var-row-right";
+
+        const readBtn = document.createElement("button");
+        readBtn.textContent = "Read";
+        readBtn.className = "btn btn-outline var-read-btn";
+        readBtn.disabled = true;
+        readBtn.onclick = () => sendReadVar(v);
+
+        const input = document.createElement("input");
+        input.type = "number";
+        input.placeholder = "value";
+        input.id = `var-write-${v.id}`;
+
+        const writeBtn = document.createElement("button");
+        writeBtn.textContent = "Write";
+        writeBtn.className = "btn btn-outline var-write-btn";
+        writeBtn.disabled = true;
+        writeBtn.onclick = () => sendWriteVar(v, input.value);
+
+        right.appendChild(readBtn);
+        right.appendChild(input);
+        right.appendChild(writeBtn);
+
+        row.appendChild(left);
+        row.appendChild(right);
+
+        varTableContainer.appendChild(row);
+        varReadButtons.push(readBtn);
+        varWriteButtons.push(writeBtn);
       });
     }
 
     function initLatestValuesUI() {
       latestValuesContainer.innerHTML = "";
+      latestValues.clear();
+
       VARIABLE_DB.forEach(v => {
         const row = document.createElement("div");
         row.className = "latest-row";
@@ -801,11 +878,6 @@
       ds.data.push({ x: t, y: value });
       if (ds.data.length > MAX_POINTS) ds.data.shift();
       dataChart.update("none");
-    }
-
-    function getSelectedVar() {
-      const id = parseInt(varSelect.value);
-      return getVarById(id);
     }
 
     /************************************************************
@@ -1012,27 +1084,32 @@
     }
 
     /************************************************************
-     * READ / WRITE BUTTON HANDLERS
+     * MULTI READ / WRITE
      ************************************************************/
-    readVarBtn.onclick = async () => {
-      const v = getSelectedVar();
-      if (!v) return;
+    async function sendReadVar(v) {
       const payload = [v.id];
       await sendFrame(buildFrame(CMD_READ_VAR, payload));
-    };
+    }
 
-    writeVarBtn.onclick = async () => {
-      const v = getSelectedVar();
-      if (!v) return;
-      const val = parseFloat(writeValue.value);
+    async function sendWriteVar(v, valStr) {
+      const val = parseFloat(valStr);
       if (Number.isNaN(val)) {
-        alert("Enter numeric value");
+        alert(`Enter a numeric value for ${v.name}`);
         return;
       }
       const endianness = v.endianness || "lsbFirst";
       const dataBytes = encodeValueBytes(v, val, endianness);
       const payload = [v.id, ...dataBytes];
       await sendFrame(buildFrame(CMD_WRITE_VAR, payload));
+
+      // Optionally log write as an event (without waiting for read-back)
+      applyDecodedValue("WRITE", v.id, val);
+    }
+
+    readAllBtn.onclick = async () => {
+      for (const v of VARIABLE_DB) {
+        await sendReadVar(v);
+      }
     };
 
     /************************************************************

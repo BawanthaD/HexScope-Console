@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Device Console</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #020617;
+      color: #e5e7eb;
+      margin: 0;
+      padding: 16px;
+    }
+    h1 {
+      margin-top: 0;
+      font-size: 1.4rem;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+      gap: 16px;
+    }
+    .panel {
+      border: 1px solid #374151;
+      border-radius: 8px;
+      padding: 12px 16px;
+      background: #020617;
+      margin-bottom: 16px;
+    }
+    .panel h2 {
+      margin: 0 0 8px 0;
+      font-size: 1rem;
+    }
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    label {
+      font-size: 0.9rem;
+      margin-right: 4px;
+    }
+    select, input, button {
+      background: #020617;
+      color: #e5e7eb;
+      border: 1px solid #4b5563;
+      border-radius: 4px;
+      padding: 4px 8px;
+      font-size: 0.9rem;
+      font-family: inherit;
+    }
+    button {
+      cursor: pointer;
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    textarea {
+      width: 100%;
+      height: 200px;
+      resize: vertical;
+      font-family: monospace;
+      font-size: 0.8rem;
+      line-height: 1.3;
+      background: #020617;
+      color: #e5e7eb;
+      border: 1px solid #4b5563;
+      border-radius: 4px;
+      padding: 6px;
+    }
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 4px;
+      background: #ef4444;
+    }
+    .status-dot.connected {
+      background: #22c55e;
+    }
+    .small {
+      font-size: 0.8rem;
+      color: #9ca3af;
+    }
+    .pill {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      background: #111827;
+      border: 1px solid #4b5563;
+      margin-right: 4px;
+    }
+    .decoded-item {
+      font-size: 0.85rem;
+      border-bottom: 1px solid #1f2937;
+      padding: 4px 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>Device Console (Browser + Web Serial)</h1>
+
+  <!-- Connection -->
+  <div class="panel">
+    <div class="row">
+      <span id="status">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusText">Disconnected</span>
+      </span>
+    </div>
+    <div class="row">
+      <label for="baudRate">Baud rate:</label>
+      <select id="baudRate">
+        <option value="9600">9600</option>
+        <option value="19200">19200</option>
+        <option value="38400">38400</option>
+        <option value="57600">57600</option>
+        <option value="115200" selected>115200</option>
+        <option value="230400">230400</option>
+        <option value="460800">460800</option>
+        <option value="921600">921600</option>
+      </select>
+
+      <button id="connectBtn">Connect</button>
+      <button id="disconnectBtn" disabled>Disconnect</button>
+    </div>
+    <div class="small">
+      Works in Chrome / Edge using Web Serial. Click “Connect” to choose a COM port.
+    </div>
+  </div>
+
+  <div class="grid">
+    <!-- Left side: User-level controls -->
+    <div>
+      <!-- Variable Read/Write -->
+      <div class="panel">
+        <h2>Variables</h2>
+        <div class="row">
+          <label for="varSelect">Variable:</label>
+          <select id="varSelect"></select>
+        </div>
+        <div class="row">
+          <button id="readVarBtn" disabled>Read variable</button>
+        </div>
+        <div class="row">
+          <label for="writeValue">Write value:</label>
+          <input type="number" id="writeValue" style="width: 120px;">
+          <button id="writeVarBtn" disabled>Write variable</button>
+        </div>
+        <div class="small">
+          You choose the variable & value. The app builds the correct frame and sends it.
+        </div>
+      </div>
+
+      <!-- Decoded frames -->
+      <div class="panel">
+        <h2>Decoded Frames</h2>
+        <div id="decodedList" class="small">
+          <!-- populated by JS -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Right side: Raw logs -->
+    <div>
+      <div class="panel">
+        <div class="row">
+          <h2 style="margin:0;">Raw RX (hex)</h2>
+          <button id="clearRxBtn" style="margin-left:auto;">Clear</button>
+        </div>
+        <textarea id="rxLog" readonly></textarea>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /************************************************************
+     *  Protocol definition (backend logic)
+     ************************************************************/
+    const SOF = 0xAA;
+    const EOF = 0x55;
+
+    const CMD_READ_VAR       = 0x01;
+    const CMD_WRITE_VAR      = 0x02;
+    const CMD_READ_RESPONSE  = 0x81;
+
+    // Example variable database
+    const VARIABLE_DB = [
+      { id: 0x10, name: 'Temperature', type: 'int16', unit: '°C' },
+      { id: 0x11, name: 'Pressure',    type: 'int16', unit: 'kPa' },
+      { id: 0x12, name: 'Flow Rate',   type: 'int16', unit: 'L/min' },
+    ];
+
+    function getVarById(id) {
+      return VARIABLE_DB.find(v => v.id === id);
+    }
+
+    function getVarByName(name) {
+      return VARIABLE_DB.find(v => v.name === name);
+    }
+
+    // Simple CRC: XOR of all bytes from LEN through end of PAYLOAD
+    function calcCRC(bytes, startIndex, endIndexInclusive) {
+      let crc = 0;
+      for (let i = startIndex; i <= endIndexInclusive; i++) {
+        crc ^= bytes[i];
+      }
+      return crc & 0xFF;
+    }
+
+    // Build frame: SOF | LEN | TYPE | PAYLOAD... | CRC | EOF
+    // LEN = TYPE + PAYLOAD length
+    function buildFrame(type, payloadBytes) {
+      const len = 1 + payloadBytes.length; // TYPE + payload
+      const frameLen = 1 + 1 + len + 1 + 1; // SOF + LEN + (TYPE+PAYLOAD) + CRC + EOF
+      const frame = new Uint8Array(frameLen);
+
+      let i = 0;
+      frame[i++] = SOF;
+      frame[i++] = len;
+      frame[i++] = type;
+      for (const b of payloadBytes) {
+        frame[i++] = b;
+      }
+      // CRC over LEN..end of payload
+      const crc = calcCRC(frame, 1, i - 1);
+      frame[i++] = crc;
+      frame[i++] = EOF;
+
+      return frame;
+    }
+
+    function buildReadVarFrame(varId) {
+      return buildFrame(CMD_READ_VAR, [varId]);
+    }
+
+    function buildWriteVarFrame(varId, valueInt16) {
+      // Assuming int16, little-endian
+      const v = valueInt16 & 0xFFFF;
+      const lo = v & 0xFF;
+      const hi = (v >> 8) & 0xFF;
+      return buildFrame(CMD_WRITE_VAR, [varId, lo, hi]);
+    }
+
+    /************************************************************
+     *  Parsing RX frames
+     ************************************************************/
+    let rxBuffer = [];
+
+    function handleIncomingBytes(chunk) {
+      // Append to buffer
+      for (const b of chunk) {
+        rxBuffer.push(b);
+      }
+
+      // Also log as hex
+      logRawHex(chunk);
+
+      // Try to extract frames
+      parseFramesFromBuffer();
+    }
+
+    function parseFramesFromBuffer() {
+      // Minimum frame: SOF, LEN, TYPE, CRC, EOF (payload can be 0)
+      const MIN_FRAME = 5;
+
+      while (rxBuffer.length >= MIN_FRAME) {
+        // Look for SOF
+        const sofIndex = rxBuffer.indexOf(SOF);
+        if (sofIndex === -1) {
+          // No SOF, drop buffer
+          rxBuffer = [];
+          return;
+        }
+        if (sofIndex > 0) {
+          // Drop bytes before SOF
+          rxBuffer = rxBuffer.slice(sofIndex);
+        }
+        if (rxBuffer.length < MIN_FRAME) {
+          return; // wait for more data
+        }
+
+        const len = rxBuffer[1];
+        const totalFrameLen = 1 + 1 + len + 1 + 1; // SOF + LEN + (TYPE+PAYLOAD) + CRC + EOF
+        if (rxBuffer.length < totalFrameLen) {
+          return; // not full frame yet
+        }
+
+        const frame = rxBuffer.slice(0, totalFrameLen);
+        rxBuffer = rxBuffer.slice(totalFrameLen);
+
+        // Check EOF
+        if (frame[frame.length - 1] !== EOF) {
+          console.warn('Bad EOF, dropping frame:', frame);
+          continue;
+        }
+
+        // Verify CRC
+        const crcReceived = frame[frame.length - 2];
+        const crcComputed = calcCRC(frame, 1, frame.length - 3); // LEN..payload end
+        if (crcReceived !== crcComputed) {
+          console.warn('CRC mismatch: got', crcReceived, 'expected', crcComputed);
+          addDecodedItem({
+            type: 'CRC_ERROR',
+            raw: frame
+          });
+          continue;
+        }
+
+        const type = frame[2];
+        const payload = frame.slice(3, frame.length - 2); // between TYPE and CRC
+
+        interpretFrame(type, payload, frame);
+      }
+    }
+
+    function interpretFrame(type, payload, rawFrame) {
+      if (type === CMD_READ_RESPONSE && payload.length >= 3) {
+        const varId = payload[0];
+        const lo = payload[1];
+        const hi = payload[2];
+        let value = (hi << 8) | lo;
+        if (value & 0x8000) {
+          value = value - 0x10000; // signed int16
+        }
+        const v = getVarById(varId);
+        const name = v ? v.name : `0x${varId.toString(16)}`;
+        const unit = v?.unit || '';
+
+        addDecodedItem({
+          type: 'READ_RESPONSE',
+          varId,
+          name,
+          value,
+          unit,
+          raw: rawFrame
+        });
+      }
+      else if (type === CMD_WRITE_VAR) {
+        // Could also get echo/ack frames here, depending on device
+        addDecodedItem({
+          type: 'WRITE_ACK_OR_ECHO',
+          raw: rawFrame
+        });
+      }
+      else {
+        addDecodedItem({
+          type: 'UNKNOWN',
+          raw: rawFrame
+        });
+      }
+    }
+
+    /************************************************************
+     *  UI + Serial handling
+     ************************************************************/
+    let port = null;
+    let reader = null;
+    let keepReading = false;
+
+    const statusDot    = document.getElementById('statusDot');
+    const statusText   = document.getElementById('statusText');
+    const connectBtn   = document.getElementById('connectBtn');
+    const disconnectBtn= document.getElementById('disconnectBtn');
+    const baudSelect   = document.getElementById('baudRate');
+    const rxLog        = document.getElementById('rxLog');
+    const clearRxBtn   = document.getElementById('clearRxBtn');
+
+    const varSelect    = document.getElementById('varSelect');
+    const readVarBtn   = document.getElementById('readVarBtn');
+    const writeVarBtn  = document.getElementById('writeVarBtn');
+    const writeValue   = document.getElementById('writeValue');
+    const decodedList  = document.getElementById('decodedList');
+
+    // Populate variable dropdown
+    function initVariableDropdown() {
+      for (const v of VARIABLE_DB) {
+        const opt = document.createElement('option');
+        opt.value = v.name;
+        opt.textContent = `${v.name} (0x${v.id.toString(16)})`;
+        varSelect.appendChild(opt);
+      }
+    }
+    initVariableDropdown();
+
+    function setConnectedState(isConnected, info = '') {
+      if (isConnected) {
+        statusDot.classList.add('connected');
+        statusText.textContent = 'Connected ' + info;
+        connectBtn.disabled = true;
+        disconnectBtn.disabled = false;
+        readVarBtn.disabled = false;
+        writeVarBtn.disabled = false;
+      } else {
+        statusDot.classList.remove('connected');
+        statusText.textContent = 'Disconnected';
+        connectBtn.disabled = false;
+        disconnectBtn.disabled = true;
+        readVarBtn.disabled = true;
+        writeVarBtn.disabled = true;
+      }
+    }
+
+    function logRawHex(chunk) {
+      const hexLine = Array.from(chunk)
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join(' ');
+      rxLog.value += hexLine + '\n';
+      rxLog.scrollTop = rxLog.scrollHeight;
+    }
+
+    function addDecodedItem(info) {
+      const div = document.createElement('div');
+      div.className = 'decoded-item';
+
+      const rawHex = Array.from(info.raw || [])
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join(' ');
+
+      if (info.type === 'READ_RESPONSE') {
+        div.innerHTML =
+          `<span class="pill">READ</span>` +
+          `<strong>${info.name}</strong> = ${info.value} ${info.unit} ` +
+          `<span class="small">(varId=0x${info.varId.toString(16)})</span><br>` +
+          `<span class="small">raw: ${rawHex}</span>`;
+      } else if (info.type === 'CRC_ERROR') {
+        div.innerHTML =
+          `<span class="pill">CRC ERROR</span> ` +
+          `<span class="small">raw: ${rawHex}</span>`;
+      } else {
+        div.innerHTML =
+          `<span class="pill">${info.type}</span> ` +
+          `<span class="small">raw: ${rawHex}</span>`;
+      }
+
+      decodedList.prepend(div); // newest on top
+    }
+
+    async function connectSerial() {
+      if (!('serial' in navigator)) {
+        alert('Web Serial API not supported in this browser.');
+        return;
+      }
+      try {
+        port = await navigator.serial.requestPort();
+        const baudRate = parseInt(baudSelect.value, 10);
+        await port.open({
+          baudRate,
+          dataBits: 8,
+          stopBits: 1,
+          parity: 'none',
+          flowControl: 'none'
+        });
+
+        setConnectedState(true, `(baud ${baudRate})`);
+
+        keepReading = true;
+        readLoop();
+      } catch (err) {
+        console.error('Error opening serial port:', err);
+        alert('Failed to open serial port: ' + err);
+      }
+    }
+
+    async function disconnectSerial() {
+      try {
+        keepReading = false;
+        if (reader) {
+          try {
+            await reader.cancel();
+          } catch (e) {
+            console.warn('Error cancelling reader:', e);
+          }
+          reader.releaseLock();
+          reader = null;
+        }
+        if (port) {
+          await port.close();
+          port = null;
+        }
+      } catch (err) {
+        console.error('Error closing serial port:', err);
+      } finally {
+        setConnectedState(false);
+      }
+    }
+
+    async function readLoop() {
+      if (!port.readable) {
+        console.warn('Port is not readable');
+        return;
+      }
+      reader = port.readable.getReader();
+      try {
+        while (keepReading) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          if (value && value.length > 0) {
+            handleIncomingBytes(value);
+          }
+        }
+      } catch (err) {
+        console.error('Read error:', err);
+      } finally {
+        if (reader) {
+          reader.releaseLock();
+          reader = null;
+        }
+        setConnectedState(false);
+      }
+    }
+
+    async function sendFrame(frame) {
+      if (!port || !port.writable) {
+        alert('Not connected');
+        return;
+      }
+      const writer = port.writable.getWriter();
+      try {
+        await writer.write(frame);
+      } catch (err) {
+        console.error('Error sending frame:', err);
+        alert('Failed to send: ' + err);
+      } finally {
+        writer.releaseLock();
+      }
+    }
+
+    async function onReadVariable() {
+      const varName = varSelect.value;
+      const v = getVarByName(varName);
+      if (!v) return;
+      const frame = buildReadVarFrame(v.id);
+      await sendFrame(frame);
+    }
+
+    async function onWriteVariable() {
+      const varName = varSelect.value;
+      const v = getVarByName(varName);
+      if (!v) return;
+      const val = parseInt(writeValue.value, 10);
+      if (Number.isNaN(val)) {
+        alert('Enter a numeric value');
+        return;
+      }
+      const frame = buildWriteVarFrame(v.id, val);
+      await sendFrame(frame);
+    }
+
+    // Wire up UI
+    connectBtn.addEventListener('click', connectSerial);
+    disconnectBtn.addEventListener('click', disconnectSerial);
+    clearRxBtn.addEventListener('click', () => { rxLog.value = ''; });
+
+    readVarBtn.addEventListener('click', onReadVariable);
+    writeVarBtn.addEventListener('click', onWriteVariable);
+  </script>
+</body>
+</html>

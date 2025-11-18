@@ -5,7 +5,8 @@
     "unit": "V",
     "format": "int16",
     "scale": 0.1,
-    "tabs": ["read", "notify"]
+    "tabs": ["read", "notify"],
+    "readFormula": "B0 + B1*255 - 140"
   },
   {
     "id": 17,

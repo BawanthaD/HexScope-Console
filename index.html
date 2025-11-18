@@ -336,6 +336,7 @@
           <div class="panel-title">Read Variables</div>
           <div class="panel-caption">
             Click <strong>Read</strong> to request a variable. The value shows <code>--</code> until the response arrives.
+            If <code>readFormula</code> is defined in <code>variables.json</code>, it will be used for decoding.
           </div>
           <div id="varTableReadContainer"></div>
           <div style="margin-top:10px;">
@@ -364,7 +365,8 @@
         <div class="panel">
           <div class="panel-title">Write Variables</div>
           <div class="panel-caption">
-            Set values for writable variables. Last known value is displayed per row.
+            Set values for writable variables. Last known value is displayed per row. <br>
+            <code>readFormula</code> is ignored for writes; encoding uses <code>format</code>, <code>scale</code>, etc.
           </div>
           <div id="varTableWriteContainer"></div>
           <div style="margin-top:10px; font-size:0.78rem; color:var(--text-muted);">
@@ -372,7 +374,7 @@
           </div>
         </div>
 
-        <!-- RIGHT: (empty or future info panel) -->
+        <!-- RIGHT: Info -->
         <div class="panel">
           <div class="panel-title">Info</div>
           <div class="panel-caption">
@@ -396,6 +398,7 @@
             <div class="panel-title">Notify Channels</div>
             <div class="panel-caption">
               Notifications are device-driven. Select which Notify IDs to decode and plot.
+              Notify decoding uses <code>notify_config.json</code> formulas only (not <code>readFormula</code>).
             </div>
             <div id="notifyListenContainer" class="small"></div>
           </div>
@@ -760,7 +763,9 @@
       return raw * scale;
     }
 
-    function evaluateNotifyFormula(formula, dataBytes) {
+    // Generic formula evaluator for READ and NOTIFY:
+    // B0 = first data byte of payload segment, B1 = second, etc.
+    function evaluateFormula(formula, dataBytes) {
       if (!formula) return null;
       let expr = formula.replace(/B(\d+)/gi, (_, idx) => ` (b[${parseInt(idx,10)}] ?? 0) `);
 
@@ -1198,7 +1203,16 @@
       if (!vDef) return;
 
       const dataBytes = payload.slice(1);
-      const value = decodeValueBytes(vDef, dataBytes, "lsbFirst");
+
+      let value;
+      if (vDef.readFormula) {
+        // Use formula for read decoding (does NOT affect write/notify)
+        value = evaluateFormula(vDef.readFormula, dataBytes);
+      } else {
+        // Fallback to standard decode using format/scale
+        value = decodeValueBytes(vDef, dataBytes, "lsbFirst");
+      }
+
       if (value === null || value === undefined) return;
 
       applyDecodedValue("READ", varId, value);
@@ -1239,7 +1253,8 @@
         let value = null;
 
         if (field.formula) {
-          value = evaluateNotifyFormula(field.formula, dataBytes);
+          // Notify-specific formula from notify_config.json
+          value = evaluateFormula(field.formula, dataBytes);
         } else {
           const start = field.startByte ?? 0;
           const len   = field.length    ?? 2;

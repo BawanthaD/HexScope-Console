@@ -1,19 +1,19 @@
 [
   {
     "id": 16,
-    "name": "Voltage",
+    "name": "Bus Voltage",
     "unit": "V",
     "format": "int16",
-    "signed": false,
-    "scale": 0.1
+    "scale": 0.1,
+    "tabs": ["read", "notify"]
   },
   {
     "id": 17,
-    "name": "Current",
+    "name": "Bus Current",
     "unit": "A",
     "format": "int16",
-    "signed": true,
-    "scale": 0.01
+    "scale": 0.01,
+    "tabs": ["write", "notify"]
   },
   {
     "id": 18,

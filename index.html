@@ -248,7 +248,7 @@
       font-size: 0.8rem;
     }
     .var-row-value {
-      min-width: 70px;
+      min-width: 90px;
       text-align: right;
       font-size: 0.8rem;
       color: var(--text-muted);
@@ -337,6 +337,7 @@
           <div class="panel-caption">
             Click <strong>Read</strong> to request a variable. The value shows <code>--</code> until the response arrives.
             If <code>readFormula</code> is defined in <code>variables.json</code>, it will be used for decoding.
+            If <code>valueMap</code> is defined, labels such as <code>ON (1)</code> will be shown.
           </div>
           <div id="varTableReadContainer"></div>
           <div style="margin-top:10px;">
@@ -367,6 +368,7 @@
           <div class="panel-caption">
             Set values for writable variables. Last known value is displayed per row. <br>
             <code>readFormula</code> is ignored for writes; encoding uses <code>format</code>, <code>scale</code>, etc.
+            If <code>valueMap</code> is present you’ll still see <code>ON (1)</code> style labels.
           </div>
           <div id="varTableWriteContainer"></div>
           <div style="margin-top:10px; font-size:0.78rem; color:var(--text-muted);">
@@ -399,6 +401,7 @@
             <div class="panel-caption">
               Notifications are device-driven. Select which Notify IDs to decode and plot.
               Notify decoding uses <code>notify_config.json</code> formulas only (not <code>readFormula</code>).
+              <br> If the underlying variable has a <code>valueMap</code>, labels are used when displaying values.
             </div>
             <div id="notifyListenContainer" class="small"></div>
           </div>
@@ -786,30 +789,45 @@
       return null;
     }
 
+    // Map numeric value to label using valueMap (if available)
+    function mapValueLabel(vDef, numericValue) {
+      if (!vDef || !vDef.valueMap) return null;
+      const key = String(numericValue);
+      if (Object.prototype.hasOwnProperty.call(vDef.valueMap, key)) {
+        return vDef.valueMap[key];
+      }
+      return null;
+    }
+
     // Only updates UI + chart. Logging is done by frame handlers.
-    function applyDecodedValue(kind, varId, value, meta = {}) {
+    function applyDecodedValue(kind, varId, numericValue, meta = {}) {
       const v = getVarById(varId);
       if (!v) return;
       const unit = v.unit || "";
 
+      const label = mapValueLabel(v, numericValue);
+      const displayStr = label
+        ? `${label} (${numericValue}${unit ? " " + unit : ""})`
+        : `${numericValue}${unit ? " " + unit : ""}`;
+
       // Latest values (Notify tab)
       const latestSlot = document.getElementById(`latest-${varId}`);
-      if (latestSlot) latestSlot.textContent = `${value} ${unit}`;
+      if (latestSlot) latestSlot.textContent = displayStr;
 
       // Read tab: value next to read row
       const readSpan = document.getElementById(`read-val-${varId}`);
       if (readSpan && (kind === "READ" || kind === "WRITE")) {
-        readSpan.textContent = `${value} ${unit}`;
+        readSpan.textContent = displayStr;
       }
 
       // Write tab: value next to write row
       const writeSpan = document.getElementById(`write-val-${varId}`);
       if (writeSpan && (kind === "READ" || kind === "WRITE" || kind === "NOTIFY")) {
-        writeSpan.textContent = `${value} ${unit}`;
+        writeSpan.textContent = displayStr;
       }
 
-      // Chart (Notify tab)
-      addChartPoint(varId, value);
+      // Chart (Notify tab) always uses numeric
+      addChartPoint(varId, numericValue);
     }
 
     /************************************************************

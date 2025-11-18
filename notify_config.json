@@ -2,20 +2,49 @@
   "notifyCases": [
     {
       "id": 1,
-      "name": "Main telemetry",
-      "enabledByDefault": false,
+      "name": "Slow Telemetry",
+      "enabledByDefault": true,
       "variables": [
         {
           "varId": 16,
-          "nameOverride": "Bus Voltage",
-          "formula": "B1 + B2 * 255 - 50"
-        },
-        {
-          "varId": 17,
-          "formula": "B2 + B3 * 256"
+          "nameOverride": "Bus Voltage (slow)",
+          "formula": "(B0 + B1*256) * 0.1"
         },
         {
           "varId": 18,
+          "nameOverride": "Temperature (slow)",
+          "formula": "(B2 + B3*256) * 0.1"
+        },
+        {
+          "varId": 20,
+          "nameOverride": "System State (slow)",
+          "formula": "B4"
+        },
+        {
+          "varId": 21,
+          "nameOverride": "Fault Flag",
+          "formula": "B5"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Fast Telemetry",
+      "enabledByDefault": true,
+      "variables": [
+        {
+          "varId": 17,
+          "nameOverride": "Motor Current (fast)",
+          "formula": "(B0 + B1*256) * 0.01"
+        },
+        {
+          "varId": 16,
+          "nameOverride": "Bus Voltage (fast)",
+          "formula": "(B2 + B3*256) * 0.1"
+        },
+        {
+          "varId": 20,
+          "nameOverride": "System State (fast)",
           "formula": "B4"
         }
       ]

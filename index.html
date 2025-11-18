@@ -214,7 +214,7 @@
       cursor: pointer;
     }
 
-    /* Variable rows for multi read/write */
+    /* Variable rows */
     .var-row {
       display: flex;
       justify-content: space-between;
@@ -246,6 +246,42 @@
     .var-row-right input[type="number"] {
       width: 90px;
       font-size: 0.8rem;
+    }
+    .var-row-value {
+      min-width: 90px;
+      text-align: right;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 14px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .tab-btn {
+      border: none;
+      background: transparent;
+      padding: 8px 14px;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      cursor: pointer;
+      border-radius: 999px 999px 0 0;
+      border-bottom: 2px solid transparent;
+      transition: 0.18s;
+    }
+    .tab-btn.active {
+      color: var(--text-primary);
+      border-bottom-color: var(--accent);
+      background: rgba(15, 23, 42, 0.9);
+    }
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
     }
 
     @media (max-width: 900px) {
@@ -285,91 +321,135 @@
 
   <!-- MAIN CONTENT -->
   <main class="page">
-    <div class="grid">
-      <!-- LEFT COLUMN -->
-      <div style="display:flex; flex-direction:column; gap:20px;">
-        <!-- VARIABLES PANEL -->
+    <!-- Tabs -->
+    <div class="tabs">
+      <button id="tabReadBtn"   class="tab-btn active">Read</button>
+      <button id="tabWriteBtn"  class="tab-btn">Write</button>
+      <button id="tabNotifyBtn" class="tab-btn">Notify & Monitor</button>
+    </div>
+
+    <!-- READ TAB -->
+    <section id="tabRead" class="tab-content active">
+      <div class="grid">
+        <!-- LEFT: Read Variables -->
         <div class="panel">
-          <div class="panel-title">Variables</div>
+          <div class="panel-title">Read Variables</div>
           <div class="panel-caption">
-            Read/write multiple variables without re-selecting
+            Click <strong>Read</strong> to request a variable. The value shows <code>--</code> until the response arrives.
+            If <code>readFormula</code> is defined in <code>variables.json</code>, it will be used for decoding.
+            If <code>valueMap</code> is defined, labels such as <code>ON (1)</code> will be shown.
           </div>
-          <div id="varTableContainer"></div>
+          <div id="varTableReadContainer"></div>
           <div style="margin-top:10px;">
             <button id="readAllBtn" class="btn btn-outline" disabled>Read All</button>
           </div>
-          <div style="margin-top:10px; font-size:0.78rem; color:var(--text-muted);">
-            Read/Write encoding (int16/int32/float32, scaling, signedness) is defined in
-            <code>variables.json</code>.
-          </div>
         </div>
 
-        <!-- LATEST VALUES PANEL -->
-        <div class="panel">
-          <div class="panel-title">Latest Values</div>
-          <div class="panel-caption">
-            Last received value for each variable (from read/notify)
-          </div>
-          <div id="latestValuesContainer"></div>
-        </div>
-
-        <!-- NOTIFY CHANNELS PANEL -->
-        <div class="panel">
-          <div class="panel-title">Notify Channels</div>
-          <div class="panel-caption">
-            Notifications are device-driven. Select which Notify IDs to decode.
-          </div>
-          <div id="notifyListenContainer" class="small"></div>
-        </div>
-
-        <!-- TOOLS PANEL -->
-        <div class="panel">
-          <div class="panel-title">Tools</div>
-          <div class="panel-caption">Reset logs, chart, and latest values</div>
-
-          <button id="clearRxBtn" class="btn btn-outline" style="width:100%; margin-bottom:8px;">
-            Clear Raw RX Log
-          </button>
-          <button id="clearValueLogBtn" class="btn btn-outline" style="width:100%; margin-bottom:8px;">
-            Clear CSV Logs
-          </button>
-          <button id="clearChartBtn" class="btn btn-outline" style="width:100%; margin-bottom:8px;">
-            Reset Chart
-          </button>
-          <button id="clearLatestBtn" class="btn btn-outline" style="width:100%;">
-            Clear Latest Values
-          </button>
-        </div>
-      </div>
-
-      <!-- RIGHT COLUMN -->
-      <div style="display:flex; flex-direction:column; gap:20px;">
-        <!-- PLOT PANEL -->
-        <div class="panel">
-          <div class="panel-title">Live Plot</div>
-          <div class="panel-caption">
-            Each variable is plotted as its own dataset (x = time, y = value)
-          </div>
-          <div id="plotVarContainer" style="margin-bottom:10px;"></div>
-          <canvas id="dataChart" height="240"></canvas>
-          <div style="margin-top:8px;">
-            <button id="downloadLogBtn" class="btn btn-outline">
-              Download CSV Logs
-            </button>
-            <span id="logInfo" style="font-size:0.78rem; color:var(--text-muted); margin-left:6px;"></span>
-          </div>
-        </div>
-
-        <!-- RAW RX PANEL -->
+        <!-- RIGHT: Raw RX -->
         <div class="panel">
           <div class="panel-title">Raw RX (Hex)</div>
           <div class="panel-caption">
-            Raw bytes received from UART, formatted as hexadecimal
+            Raw bytes received from UART, formatted as hexadecimal (for debugging).
           </div>
           <textarea id="rxLog" readonly></textarea>
+          <button id="clearRxBtn" class="btn btn-outline" style="width:100%; margin-top:8px;">
+            Clear Raw RX Log
+          </button>
         </div>
       </div>
-    </div>
+    </section>
+
+    <!-- WRITE TAB -->
+    <section id="tabWrite" class="tab-content">
+      <div class="grid">
+        <!-- LEFT: Write Variables -->
+        <div class="panel">
+          <div class="panel-title">Write Variables</div>
+          <div class="panel-caption">
+            Set values for writable variables. Last known value is displayed per row. <br>
+            <code>readFormula</code> is ignored for writes; encoding uses <code>format</code>, <code>scale</code>, etc.
+            If <code>valueMap</code> is present you’ll still see <code>ON (1)</code> style labels.
+          </div>
+          <div id="varTableWriteContainer"></div>
+          <div style="margin-top:10px; font-size:0.78rem; color:var(--text-muted);">
+            Encoding (int16/int32/float32, scaling, signedness) is defined in <code>variables.json</code>.
+          </div>
+        </div>
+
+        <!-- RIGHT: Info -->
+        <div class="panel">
+          <div class="panel-title">Info</div>
+          <div class="panel-caption">
+            This panel is reserved for future write-related tools (batch write, templates, etc.).
+          </div>
+          <p style="font-size:0.85rem; color:var(--text-muted);">
+            For now, use the left panel to write individual variables. Values written here also appear in the
+            <strong>Notify &amp; Monitor</strong> tab if those variables are plotted or shown in Latest Values.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- NOTIFY TAB -->
+    <section id="tabNotify" class="tab-content">
+      <div class="grid">
+        <!-- LEFT: Notify + Latest + Tools -->
+        <div style="display:flex; flex-direction:column; gap:20px;">
+          <!-- Notify panel -->
+          <div class="panel">
+            <div class="panel-title">Notify Channels</div>
+            <div class="panel-caption">
+              Notifications are device-driven. Select which Notify IDs to decode and plot.
+              Notify decoding uses <code>notify_config.json</code> formulas only (not <code>readFormula</code>).
+              <br> If the underlying variable has a <code>valueMap</code>, labels are used when displaying values.
+            </div>
+            <div id="notifyListenContainer" class="small"></div>
+          </div>
+
+          <!-- Latest values -->
+          <div class="panel">
+            <div class="panel-title">Latest Values</div>
+            <div class="panel-caption">
+              Last received value for each variable (from notify/read/write).
+            </div>
+            <div id="latestValuesContainer"></div>
+          </div>
+
+          <!-- Tools -->
+          <div class="panel">
+            <div class="panel-title">Tools & Logging</div>
+            <div class="panel-caption">
+              CSV logging is per frame. Notify logs are grouped by Notify ID.
+            </div>
+            <button id="downloadLogBtn" class="btn btn-outline" style="width:100%; margin-bottom:8px;">
+              Download CSV Logs
+            </button>
+            <button id="clearValueLogBtn" class="btn btn-outline" style="width:100%; margin-bottom:8px;">
+              Clear CSV Logs
+            </button>
+            <button id="clearChartBtn" class="btn btn-outline" style="width:100%; margin-bottom:8px;">
+              Reset Chart
+            </button>
+            <button id="clearLatestBtn" class="btn btn-outline" style="width:100%;">
+              Clear Latest Values
+            </button>
+            <div style="margin-top:8px; font-size:0.78rem; color:var(--text-muted);">
+              <span id="logInfo"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- RIGHT: Plot -->
+        <div class="panel">
+          <div class="panel-title">Live Plot</div>
+          <div class="panel-caption">
+            Variables are plotted as separate datasets (x = time, y = value).
+          </div>
+          <div id="plotVarContainer" style="margin-bottom:10px;"></div>
+          <canvas id="dataChart" height="260"></canvas>
+        </div>
+      </div>
+    </section>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -396,9 +476,12 @@
     let VARIABLE_DB = [];
     let NOTIFY_CONFIG = [];
 
+    // Tab-specific variable arrays
+    let READ_VARS = [];
+    let WRITE_VARS = [];
+
     // Read/Write logs (per frame)
-    // Each entry: { time, kind, values: { [varId]: {name, value, unit} } }
-    const readWriteLog = [];
+    const readWriteLog = []; // { time, kind, values: { [varId]: {name, value, unit} } }
 
     // Notify logs (per frame): notifyId -> [ { time, values: { [varId]: value } } ]
     const notifyLogs = new Map();
@@ -410,7 +493,9 @@
     }
 
     function updateSampleCount() {
-      logInfo.textContent = `${getTotalSampleCount()} samples`;
+      if (logInfo) {
+        logInfo.textContent = `${getTotalSampleCount()} samples`;
+      }
     }
 
     // Latest values: varId -> { value, unit, time }
@@ -446,8 +531,16 @@
     const connectBtn  = document.getElementById("connectBtn");
     const disconnectBtn = document.getElementById("disconnectBtn");
 
-    const varTableContainer     = document.getElementById("varTableContainer");
-    const readAllBtn            = document.getElementById("readAllBtn");
+    const tabReadBtn   = document.getElementById("tabReadBtn");
+    const tabWriteBtn  = document.getElementById("tabWriteBtn");
+    const tabNotifyBtn = document.getElementById("tabNotifyBtn");
+    const tabRead      = document.getElementById("tabRead");
+    const tabWrite     = document.getElementById("tabWrite");
+    const tabNotify    = document.getElementById("tabNotify");
+
+    const varTableReadContainer  = document.getElementById("varTableReadContainer");
+    const varTableWriteContainer = document.getElementById("varTableWriteContainer");
+    const readAllBtn             = document.getElementById("readAllBtn");
 
     const latestValuesContainer = document.getElementById("latestValuesContainer");
     const notifyListenContainer = document.getElementById("notifyListenContainer");
@@ -460,6 +553,33 @@
     const clearChartBtn     = document.getElementById("clearChartBtn");
     const clearLatestBtn    = document.getElementById("clearLatestBtn");
     const downloadLogBtn    = document.getElementById("downloadLogBtn");
+
+    /************************************************************
+     * TABS
+     ************************************************************/
+    function showTab(tab) {
+      tabRead.classList.remove("active");
+      tabWrite.classList.remove("active");
+      tabNotify.classList.remove("active");
+      tabReadBtn.classList.remove("active");
+      tabWriteBtn.classList.remove("active");
+      tabNotifyBtn.classList.remove("active");
+
+      if (tab === "read") {
+        tabRead.classList.add("active");
+        tabReadBtn.classList.add("active");
+      } else if (tab === "write") {
+        tabWrite.classList.add("active");
+        tabWriteBtn.classList.add("active");
+      } else {
+        tabNotify.classList.add("active");
+        tabNotifyBtn.classList.add("active");
+      }
+    }
+
+    tabReadBtn.onclick   = () => showTab("read");
+    tabWriteBtn.onclick  = () => showTab("write");
+    tabNotifyBtn.onclick = () => showTab("notify");
 
     /************************************************************
      * CONFIG LOAD
@@ -475,7 +595,8 @@
         const notifyJson = await notifyRes.json();
         NOTIFY_CONFIG = notifyJson.notifyCases || [];
 
-        initVarTable();
+        computeTabVariables();
+        initVarTables();
         initLatestValuesUI();
         initNotifyUI();
         initChart();
@@ -483,6 +604,19 @@
         console.error("Failed to load configs:", e);
         alert("Failed to load variables.json or notify_config.json");
       }
+    }
+
+    function inTab(v, tabName) {
+      if (!v.tabs || !Array.isArray(v.tabs)) {
+        // No tabs specified → available in all tabs (backward compatible)
+        return true;
+      }
+      return v.tabs.includes(tabName);
+    }
+
+    function computeTabVariables() {
+      READ_VARS  = VARIABLE_DB.filter(v => inTab(v, "read"));
+      WRITE_VARS = VARIABLE_DB.filter(v => inTab(v, "write"));
     }
 
     loadConfigs();
@@ -561,7 +695,7 @@
         const val = jsValue / scale;
         const buf = new ArrayBuffer(4);
         const view = new DataView(buf);
-        view.setFloat32(0, val, false); // big-endian
+        view.setFloat32(0, val, false);
         let arr = [
           view.getUint8(0),
           view.getUint8(1),
@@ -577,7 +711,7 @@
 
       if (fmt === "int16" || fmt === "uint16") {
         let v = raw & 0xFFFF;
-        bytes = [(v & 0xFF), (v >> 8) & 0xFF]; // LSB, MSB
+        bytes = [(v & 0xFF), (v >> 8) & 0xFF];
       } else if (fmt === "int32" || fmt === "uint32") {
         let v = raw >>> 0;
         bytes = [
@@ -585,9 +719,8 @@
           (v >> 8) & 0xFF,
           (v >> 16) & 0xFF,
           (v >> 24) & 0xFF
-        ]; // LSB first
+        ];
       } else {
-        // default int16
         let v = raw & 0xFFFF;
         bytes = [(v & 0xFF), (v >> 8) & 0xFF];
       }
@@ -602,7 +735,6 @@
       const scale  = vDef.scale ?? 1.0;
 
       let arr = Array.from(bytes);
-      // re-order to big-endian in arr[0..n]
       if (endianness === "lsbFirst") arr = arr.slice().reverse();
 
       let raw = 0;
@@ -627,7 +759,6 @@
         const fval = view.getFloat32(0, false);
         return fval * scale;
       } else {
-        // generic unsigned int
         raw = 0;
         arr.forEach(b => { raw = (raw << 8) | b; });
       }
@@ -635,14 +766,12 @@
       return raw * scale;
     }
 
-    // Formula evaluator for NOTIFY: e.g. "B0 + B1*255 - 50"
-    // B0 = first data byte after notifyId, B1 = second, etc.
-    function evaluateNotifyFormula(formula, dataBytes) {
+    // Generic formula evaluator for READ and NOTIFY:
+    // B0 = first data byte of payload segment, B1 = second, etc.
+    function evaluateFormula(formula, dataBytes) {
       if (!formula) return null;
-      // Replace B<number> with b[<number>] (array access)
       let expr = formula.replace(/B(\d+)/gi, (_, idx) => ` (b[${parseInt(idx,10)}] ?? 0) `);
 
-      // Basic sanity check: only allow digits, operators, parentheses, spaces, 'b', '[', ']', '.'
       if (!/^[0-9+\-*/().,\s b\[\]?<>!=&|^%]*$/i.test(expr)) {
         console.warn("Unsafe characters in formula:", formula);
         return null;
@@ -660,27 +789,58 @@
       return null;
     }
 
+    // Map numeric value to label using valueMap (if available)
+    function mapValueLabel(vDef, numericValue) {
+      if (!vDef || !vDef.valueMap) return null;
+      const key = String(numericValue);
+      if (Object.prototype.hasOwnProperty.call(vDef.valueMap, key)) {
+        return vDef.valueMap[key];
+      }
+      return null;
+    }
+
     // Only updates UI + chart. Logging is done by frame handlers.
-    function applyDecodedValue(kind, varId, value, meta = {}) {
+    function applyDecodedValue(kind, varId, numericValue, meta = {}) {
       const v = getVarById(varId);
       if (!v) return;
       const unit = v.unit || "";
 
-      const slot = document.getElementById(`latest-${varId}`);
-      if (slot) slot.textContent = `${value} ${unit}`;
+      const label = mapValueLabel(v, numericValue);
+      const displayStr = label
+        ? `${label} (${numericValue}${unit ? " " + unit : ""})`
+        : `${numericValue}${unit ? " " + unit : ""}`;
 
-      addChartPoint(varId, value);
+      // Latest values (Notify tab)
+      const latestSlot = document.getElementById(`latest-${varId}`);
+      if (latestSlot) latestSlot.textContent = displayStr;
+
+      // Read tab: value next to read row
+      const readSpan = document.getElementById(`read-val-${varId}`);
+      if (readSpan && (kind === "READ" || kind === "WRITE")) {
+        readSpan.textContent = displayStr;
+      }
+
+      // Write tab: value next to write row
+      const writeSpan = document.getElementById(`write-val-${varId}`);
+      if (writeSpan && (kind === "READ" || kind === "WRITE" || kind === "NOTIFY")) {
+        writeSpan.textContent = displayStr;
+      }
+
+      // Chart (Notify tab) always uses numeric
+      addChartPoint(varId, numericValue);
     }
 
     /************************************************************
      * UI INIT
      ************************************************************/
-    function initVarTable() {
-      varTableContainer.innerHTML = "";
+    function initVarTables() {
+      varTableReadContainer.innerHTML = "";
+      varTableWriteContainer.innerHTML = "";
       varReadButtons = [];
       varWriteButtons = [];
 
-      VARIABLE_DB.forEach(v => {
+      // READ TAB TABLE
+      READ_VARS.forEach(v => {
         const row = document.createElement("div");
         row.className = "var-row";
 
@@ -708,6 +868,44 @@
         readBtn.disabled = true;
         readBtn.onclick = () => sendReadVar(v);
 
+        const valueSpan = document.createElement("div");
+        valueSpan.className = "var-row-value";
+        valueSpan.id = `read-val-${v.id}`;
+        valueSpan.textContent = "—";
+
+        right.appendChild(readBtn);
+        right.appendChild(valueSpan);
+
+        row.appendChild(left);
+        row.appendChild(right);
+
+        varTableReadContainer.appendChild(row);
+        varReadButtons.push(readBtn);
+      });
+
+      // WRITE TAB TABLE
+      WRITE_VARS.forEach(v => {
+        const row = document.createElement("div");
+        row.className = "var-row";
+
+        const left = document.createElement("div");
+        left.className = "var-row-left";
+
+        const name = document.createElement("div");
+        name.className = "var-row-name";
+        name.textContent = v.name;
+
+        const meta = document.createElement("div");
+        meta.className = "var-row-meta";
+        const unit = v.unit ? `, ${v.unit}` : "";
+        meta.textContent = `ID 0x${v.id.toString(16)} · ${v.format || "int16"}${unit}`;
+
+        left.appendChild(name);
+        left.appendChild(meta);
+
+        const right = document.createElement("div");
+        right.className = "var-row-right";
+
         const input = document.createElement("input");
         input.type = "number";
         input.placeholder = "value";
@@ -719,15 +917,19 @@
         writeBtn.disabled = true;
         writeBtn.onclick = () => sendWriteVar(v, input.value);
 
-        right.appendChild(readBtn);
+        const valueSpan = document.createElement("div");
+        valueSpan.className = "var-row-value";
+        valueSpan.id = `write-val-${v.id}`;
+        valueSpan.textContent = "—";
+
         right.appendChild(input);
         right.appendChild(writeBtn);
+        right.appendChild(valueSpan);
 
         row.appendChild(left);
         row.appendChild(right);
 
-        varTableContainer.appendChild(row);
-        varReadButtons.push(readBtn);
+        varTableWriteContainer.appendChild(row);
         varWriteButtons.push(writeBtn);
       });
     }
@@ -784,7 +986,9 @@
     }
 
     function initChart() {
-      const ctx = document.getElementById("dataChart").getContext("2d");
+      const ctx = document.getElementById("dataChart")?.getContext("2d");
+      if (!ctx) return;
+
       VARIABLE_DB.forEach((v, idx) => {
         datasets.push({
           label: v.name,
@@ -855,7 +1059,7 @@
       const t = (performance.now() - t0) / 1000;
       ds.data.push({ x: t, y: value });
       if (ds.data.length > MAX_POINTS) ds.data.shift();
-      dataChart.update("none");
+      if (dataChart) dataChart.update("none");
     }
 
     /************************************************************
@@ -952,7 +1156,7 @@
     }
 
     function parseFramesFromBuffer() {
-      const MIN_FRAME = 5; // SOF + LEN + TYPE + CRC + EOF (no payload)
+      const MIN_FRAME = 5; // SOF + LEN + TYPE + CRC + EOF
 
       while (rxBuffer.length >= MIN_FRAME) {
         const sofIndex = rxBuffer.indexOf(PROTOCOL.SOF);
@@ -1005,7 +1209,7 @@
       } else if (type === CMD_NOTIFY_DATA) {
         handleNotifyData(payload);
       } else {
-        // unknown type, ignore or extend as needed
+        // unknown type
       }
     }
 
@@ -1017,13 +1221,20 @@
       if (!vDef) return;
 
       const dataBytes = payload.slice(1);
-      const value = decodeValueBytes(vDef, dataBytes, "lsbFirst");
+
+      let value;
+      if (vDef.readFormula) {
+        // Use formula for read decoding (does NOT affect write/notify)
+        value = evaluateFormula(vDef.readFormula, dataBytes);
+      } else {
+        // Fallback to standard decode using format/scale
+        value = decodeValueBytes(vDef, dataBytes, "lsbFirst");
+      }
+
       if (value === null || value === undefined) return;
 
-      // UI + chart
       applyDecodedValue("READ", varId, value);
 
-      // Log as one-frame row (even if only one var)
       const time = new Date().toISOString();
       const values = {};
       values[String(varId)] = {
@@ -1051,7 +1262,7 @@
       if (!cfg || !cfg.variables) return;
 
       const time = new Date().toISOString();
-      const rowValues = {}; // varId(string) -> value
+      const rowValues = {};
 
       cfg.variables.forEach(field => {
         const vDef = getVarById(field.varId);
@@ -1060,10 +1271,9 @@
         let value = null;
 
         if (field.formula) {
-          // Formula-based decoding, ignore startByte/length/endianness
-          value = evaluateNotifyFormula(field.formula, dataBytes);
+          // Notify-specific formula from notify_config.json
+          value = evaluateFormula(field.formula, dataBytes);
         } else {
-          // Legacy byte-based decoding
           const start = field.startByte ?? 0;
           const len   = field.length    ?? 2;
           const end   = start + len;
@@ -1076,10 +1286,8 @@
 
         if (value === null || value === undefined) return;
 
-        // UI + chart
         applyDecodedValue("NOTIFY", vDef.id, value, { notifyId });
 
-        // Log into this frame row
         rowValues[String(vDef.id)] = value;
       });
 
@@ -1100,6 +1308,9 @@
      * MULTI READ / WRITE
      ************************************************************/
     async function sendReadVar(v) {
+      const span = document.getElementById(`read-val-${v.id}`);
+      if (span) span.textContent = "--";
+
       const payload = [v.id];
       await sendFrame(buildFrame(CMD_READ_VAR, payload));
     }
@@ -1115,10 +1326,8 @@
       const payload = [v.id, ...dataBytes];
       await sendFrame(buildFrame(CMD_WRITE_VAR, payload));
 
-      // UI + chart
       applyDecodedValue("WRITE", v.id, val);
 
-      // Log as a frame with one var
       const time = new Date().toISOString();
       const values = {};
       values[String(v.id)] = {
@@ -1135,7 +1344,7 @@
     }
 
     readAllBtn.onclick = async () => {
-      for (const v of VARIABLE_DB) {
+      for (const v of READ_VARS) {
         await sendReadVar(v);
       }
     };
@@ -1176,9 +1385,8 @@
 
       const ts = new Date().toISOString().replace(/[:.]/g, "-");
 
-      // 1) Read/Write CSV (wide format: columns per variable)
+      // 1) Read/Write CSV
       if (readWriteLog.length) {
-        // Column order: time, kind, then one column per VARIABLE_DB
         const headers = ["time", "kind", ...VARIABLE_DB.map(v => JSON.stringify(v.name))];
         const lines = [headers.join(",")];
 
@@ -1204,14 +1412,13 @@
         URL.revokeObjectURL(url);
       }
 
-      // 2) One CSV per notify channel (wide format: one row per frame, columns per var)
+      // 2) Notify CSVs (one per notifyId)
       notifyLogs.forEach((entries, notifyId) => {
         if (!entries.length) return;
 
         const cfg = getNotifyCaseById(notifyId);
         if (!cfg || !cfg.variables) return;
 
-        // Column definitions
         const colDefs = cfg.variables.map(field => {
           const vDef = getVarById(field.varId);
           const baseName = field.nameOverride || (vDef ? vDef.name : `Var ${field.varId}`);

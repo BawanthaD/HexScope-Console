@@ -104,8 +104,9 @@
     "name": "Defrost Cutoff Temperature",
     "unit": "°C",
     "format": "int16",
-    "scale": 0.1,
-    "tabs": ["write"]
+    "scale": 1,
+    "tabs": ["write"],
+    "writeFormula": "(V + 50)"
   },
   {
     "id": 97,

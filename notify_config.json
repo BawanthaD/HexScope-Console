@@ -3,7 +3,7 @@
     {
       "id": 1,
       "name": "Slow Telemetry",
-      "enabledByDefault": true,
+      "enabledByDefault": false,
       "variables": [
         {
           "varId": 16,
@@ -30,7 +30,7 @@
     {
       "id": 2,
       "name": "Fast Telemetry",
-      "enabledByDefault": true,
+      "enabledByDefault": false,
       "variables": [
         {
           "varId": 17,

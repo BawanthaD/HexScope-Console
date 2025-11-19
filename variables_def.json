@@ -1,0 +1,50 @@
+[
+  {
+    "id": 16,
+    "name": "Bus Voltage",
+    "unit": "V",
+    "format": "int16",
+    "scale": 0.1,
+    "tabs": ["read", "write", "notify"]
+  },
+  {
+    "id": 17,
+    "name": "Motor Current",
+    "unit": "A",
+    "format": "int16",
+    "scale": 0.01,
+    "tabs": ["read", "write", "notify"]
+  },
+  {
+    "id": 18,
+    "name": "Temperature",
+    "unit": "°C",
+    "format": "int16",
+    "scale": 0.1,
+    "tabs": ["read", "write", "notify"]
+  },
+  {
+    "id": 20,
+    "name": "System State",
+    "unit": "",
+    "format": "int16",
+    "tabs": ["read", "write", "notify"],
+    "valueMap": {
+      "0": "OFF",
+      "1": "IDLE",
+      "2": "RUNNING",
+      "3": "ERROR"
+    }
+  },
+  {
+    "id": 21,
+    "name": "Fault Flag",
+    "unit": "",
+    "format": "int16",
+    "tabs": ["read", "write", "notify"],
+    "valueMap": {
+      "0": "OK",
+      "1": "FAULT"
+    }
+  }
+]

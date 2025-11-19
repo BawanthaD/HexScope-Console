@@ -1,50 +1,126 @@
 [
   {
-    "id": 16,
-    "name": "Bus Voltage",
-    "unit": "V",
+    "id": 1,
+    "name": "Mode",
+    "unit": "",
     "format": "int16",
-    "scale": 0.1,
-    "tabs": ["read", "write", "notify"]
+    "tabs": ["read","notify"],
+    "valueMap": {
+      "0": "ERROR",
+      "1": "DEFROST",
+      "2": "ACTIVE"
+    }
   },
   {
-    "id": 17,
-    "name": "Motor Current",
-    "unit": "A",
+    "id": 2,
+    "name": "Compressor State",
+    "unit": "",
     "format": "int16",
+    "tabs": ["read","notify"],
+    "valueMap": {
+      "0": "LOCKOUT",
+      "1": "READY",
+      "2": "STARTING",
+      "3": "SET_STABLE",
+      "4": "OFF"
+    }
+  },
+  {
+    "id": 3,
+    "name": "Fan State",
+    "unit": "",
+    "format": "int16",
+    "tabs": ["read","notify"],
+    "valueMap": {
+      "0": "OFF",
+      "1": "WAITING",
+      "2": "RUNNING"
+    }
+  },
+  {
+    "id": 4,
+    "name": "Heater State",
+    "unit": "",
+    "format": "int16",
+    "tabs": ["read","notify"],
+    "valueMap": {
+      "0": "OFF",
+      "1": "ON"
+    }
+  },
+  {
+    "id": 5,
+    "name": "Freezer Temperature",
+    "unit": "°C",
+    "format": "int32",
     "scale": 0.01,
-    "tabs": ["read", "write", "notify"]
+    "tabs": ["read","notify"]
   },
   {
-    "id": 18,
-    "name": "Temperature",
+    "id": 6,
+    "name": "Compartment Temperature",
     "unit": "°C",
     "format": "int16",
     "scale": 0.1,
-    "tabs": ["read", "write", "notify"]
+    "tabs": ["read","notify"]
   },
   {
-    "id": 20,
-    "name": "System State",
+    "id": 7,
+    "name": "Door State",
     "unit": "",
     "format": "int16",
-    "tabs": ["read", "write", "notify"],
+    "tabs": ["read", "notify"],
     "valueMap": {
-      "0": "OFF",
-      "1": "IDLE",
-      "2": "RUNNING",
-      "3": "ERROR"
+      "0": "CLOSED",
+      "1": "OPEN"
     }
   },
   {
-    "id": 21,
-    "name": "Fault Flag",
+    "id": 8,
+    "name": "Voltage",
     "unit": "",
+    "format": "int32",
+    "scale": 0.1,
+    "tabs": ["read","notify"]
+  },
+  {
+    "id": 9,
+    "name": "Defrost Count",
+    "unit": "",
+    "format": "int32",
+    "scale": 1,
+    "tabs": ["read","notify"]
+  },
+  {
+    "id": 10,
+    "name": "Lockout Count",
+    "unit": "",
+    "format": "int32",
+    "scale": 1,
+    "tabs": ["read","notify"]
+  },
+  {
+    "id": 96,
+    "name": "Defrost Cutoff Temperature",
+    "unit": "°C",
     "format": "int16",
-    "tabs": ["read", "write", "notify"],
-    "valueMap": {
-      "0": "OK",
-      "1": "FAULT"
-    }
+    "scale": 0.1,
+    "tabs": ["write"]
+  },
+  {
+    "id": 97,
+    "name": "Defrost Time",
+    "unit": "seconds",
+    "format": "int16",
+    "scale": 1,
+    "tabs": ["write"]
+  },
+  {
+    "id": 99,
+    "name": "Lockout Time",
+    "unit": "seconds",
+    "format": "int16",
+    "scale": 1,
+    "tabs": ["write"]
   }
 ]

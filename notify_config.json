@@ -2,50 +2,72 @@
   "notifyCases": [
     {
       "id": 1,
-      "name": "Slow Telemetry",
+      "name": "Status Service",
       "enabledByDefault": false,
       "variables": [
         {
-          "varId": 16,
-          "nameOverride": "Bus Voltage (slow)",
-          "formula": "(B0 + B1*256) * 0.1"
+          "varId": 1,
+          "nameOverride": "Mode",
+          "formula": "B0"
         },
         {
-          "varId": 18,
-          "nameOverride": "Temperature (slow)",
-          "formula": "(B2 + B3*256) * 0.1"
-        },
-        {
-          "varId": 20,
-          "nameOverride": "System State (slow)",
+          "varId": 2,
+          "nameOverride": "Compressor State",
           "formula": "B4"
         },
         {
-          "varId": 21,
-          "nameOverride": "Fault Flag",
-          "formula": "B5"
+          "varId": 3,
+          "nameOverride": "Fan State",
+          "formula": "B8"
+        },
+        {
+          "varId": 4,
+          "nameOverride": "Heater State",
+          "formula": "B12"
+        },
+        {
+          "varId": 7,
+          "nameOverride": "Door State",
+          "formula": "B16"
         }
       ]
     },
     {
       "id": 2,
-      "name": "Fast Telemetry",
+      "name": "Temperature Service",
+      "enabledByDefault": true,
+      "variables": [
+        {
+          "varId": 5,
+          "nameOverride": "Freezer Temperature",
+          "formula": "((B0 | (B1<<8) | (B2<<16) | (B3<<24)) << 0) / 10"
+        },
+        {
+          "varId": 6,
+          "nameOverride": "Fresh Food Temperature",
+          "formula": "(B4 + B5*256 + B6*65536 + B7*16777216) / 10.0"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "name": "Statistics Service",
       "enabledByDefault": false,
       "variables": [
         {
-          "varId": 17,
-          "nameOverride": "Motor Current (fast)",
-          "formula": "(B0 + B1*256) * 0.01"
+          "varId": 8,
+          "nameOverride": "Line Voltage",
+          "formula": "(B0 + B1*256 + B2*65536 + B3*16777216) / 100.0"
         },
         {
-          "varId": 16,
-          "nameOverride": "Bus Voltage (fast)",
-          "formula": "(B2 + B3*256) * 0.1"
+          "varId": 9,
+          "nameOverride": "Defrost Count",
+          "formula": "(B4 + B5*256 + B6*65536 + B7*16777216)"
         },
         {
-          "varId": 20,
-          "nameOverride": "System State (fast)",
-          "formula": "B4"
+          "varId": 10,
+          "nameOverride": "Lockout Count",
+          "formula": "(B8 + B9*256 + B10*65536 + B11*16777216)"
         }
       ]
     }

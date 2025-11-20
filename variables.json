@@ -21,8 +21,9 @@
       "0": "LOCKOUT",
       "1": "READY",
       "2": "STARTING",
-      "3": "SET_STABLE",
-      "4": "OFF"
+      "3": "RUNNING",
+      "4": "SET_STABLE",
+      "5": "OFF"
     }
   },
   {
@@ -53,7 +54,7 @@
     "name": "Freezer Temperature",
     "unit": "°C",
     "format": "int32",
-    "scale": 0.01,
+    "scale": 0.1,
     "tabs": ["read","notify"]
   },
   {
@@ -99,14 +100,26 @@
     "scale": 1,
     "tabs": ["read","notify"]
   },
-  {
+    {
     "id": 96,
-    "name": "Defrost Cutoff Temperature",
+    "name": "Freezer Temp",
     "unit": "°C",
     "format": "int16",
-    "scale": 0.1,
-    "tabs": ["write"]
-  },
+    "signed": true,
+    "tabs": ["write"],
+    "lut": {
+        "interpolation": "linear",
+        "points": [
+        { "raw": 100, "eng": -30.0 },
+        { "raw": 200, "eng": -20.0 },
+        { "raw": 300, "eng": -10.0 },
+        { "raw": 400, "eng":   0.0 },
+        { "raw": 500, "eng":  10.0 },
+        { "raw": 600, "eng":  20.0 }
+        ]
+    }
+    },
+
   {
     "id": 97,
     "name": "Defrost Time",

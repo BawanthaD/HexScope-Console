@@ -368,6 +368,8 @@
           <div class="panel-caption">
             Set values for writable variables. Last known value is displayed per row. <br>
             <code>readFormula</code> is ignored for writes; encoding uses <code>format</code>, <code>scale</code>, etc.
+            If <code>writeFormula</code> is defined, it will be used to convert the engineering value (what you type)
+            to a raw value (e.g. ADC counts) before encoding.
             If <code>valueMap</code> is present you’ll still see <code>ON (1)</code> style labels.
           </div>
           <div id="varTableWriteContainer"></div>
@@ -766,8 +768,7 @@
       return raw * scale;
     }
 
-    // Generic formula evaluator for READ and NOTIFY:
-    // B0 = first data byte of payload segment, B1 = second, etc.
+    // READ / NOTIFY formula: dataBytes -> value; uses B0, B1, ...
     function evaluateFormula(formula, dataBytes) {
       if (!formula) return null;
       let expr = formula.replace(/B(\d+)/gi, (_, idx) => ` (b[${parseInt(idx,10)}] ?? 0) `);
@@ -788,6 +789,77 @@
       }
       return null;
     }
+
+    // WRITE formula: engineering value V -> raw value; uses V
+    function evaluateWriteFormula(formula, userValue) {
+      if (!formula) return null;
+      // replace all V or v with "v"
+      let expr = formula.replace(/V/gi, " v ");
+
+      // basic safety: only allow digits, ops, whitespace, and 'v'
+      if (!/^[0-9+\-*/().,\s v<>!=&|^%]*$/i.test(expr)) {
+        console.warn("Unsafe characters in writeFormula:", formula);
+        return null;
+      }
+
+      try {
+        const fn = new Function("v", "return " + expr + ";");
+        const val = fn(userValue);
+        if (typeof val === "number" && isFinite(val)) {
+          return val;
+        }
+      } catch (e) {
+        console.warn("Error evaluating writeFormula:", formula, e);
+      }
+      return null;
+    }
+
+    // LUT: raw ADC -> engineering
+    function lutRawToEng(lutDef, raw) {
+      if (!lutDef || !Array.isArray(lutDef.points) || lutDef.points.length === 0) {
+        return null;
+      }
+      const pts = lutDef.points.slice().sort((a, b) => a.raw - b.raw);
+
+      if (raw <= pts[0].raw) return pts[0].eng;
+      if (raw >= pts[pts.length - 1].raw) return pts[pts.length - 1].eng;
+
+      for (let i = 0; i < pts.length - 1; i++) {
+        const p0 = pts[i];
+        const p1 = pts[i + 1];
+        if (raw >= p0.raw && raw <= p1.raw) {
+          const dx = p1.raw - p0.raw;
+          if (dx === 0) return p0.eng;
+          const t = (raw - p0.raw) / dx;
+          return p0.eng + t * (p1.eng - p0.eng);
+        }
+      }
+      return null;
+    }
+
+    // LUT: engineering -> raw ADC
+    function lutEngToRaw(lutDef, eng) {
+      if (!lutDef || !Array.isArray(lutDef.points) || lutDef.points.length === 0) {
+        return null;
+      }
+      const pts = lutDef.points.slice().sort((a, b) => a.eng - b.eng);
+
+      if (eng <= pts[0].eng) return pts[0].raw;
+      if (eng >= pts[pts.length - 1].eng) return pts[pts.length - 1].raw;
+
+      for (let i = 0; i < pts.length - 1; i++) {
+        const p0 = pts[i];
+        const p1 = pts[i + 1];
+        if (eng >= p0.eng && eng <= p1.eng) {
+          const dy = p1.eng - p0.eng;
+          if (dy === 0) return p0.raw;
+          const t = (eng - p0.eng) / dy;
+          return p0.raw + t * (p1.raw - p0.raw);
+        }
+      }
+      return null;
+    }
+
 
     // Map numeric value to label using valueMap (if available)
     function mapValueLabel(vDef, numericValue) {
@@ -1223,11 +1295,17 @@
       const dataBytes = payload.slice(1);
 
       let value;
+      // 1) Highest priority: readFormula
       if (vDef.readFormula) {
-        // Use formula for read decoding (does NOT affect write/notify)
         value = evaluateFormula(vDef.readFormula, dataBytes);
+      } else if (vDef.lut && Array.isArray(vDef.lut.points)) {
+        // 2) LUT path: decode RAW (no scale), then map via LUT
+        const vRawDef = { ...vDef, scale: 1 };
+        const raw = decodeValueBytes(vRawDef, dataBytes, "lsbFirst");
+        if (raw === null || raw === undefined) return;
+        value = lutRawToEng(vDef.lut, raw);
       } else {
-        // Fallback to standard decode using format/scale
+        // 3) Normal decode (format + scale)
         value = decodeValueBytes(vDef, dataBytes, "lsbFirst");
       }
 
@@ -1281,8 +1359,19 @@
 
           const slice = dataBytes.slice(start, end);
           const endianness = field.endianness || "lsbFirst";
-          value = decodeValueBytes(vDef, slice, endianness);
+
+          if (vDef.lut && Array.isArray(vDef.lut.points)) {
+            // Decode RAW ADC, then LUT → engineering
+            const vRawDef = { ...vDef, scale: 1 };
+            const raw = decodeValueBytes(vRawDef, slice, endianness);
+            if (raw === null || raw === undefined) return;
+            value = lutRawToEng(vDef.lut, raw);
+          } else {
+            // Normal decode
+            value = decodeValueBytes(vDef, slice, endianness);
+          }
         }
+
 
         if (value === null || value === undefined) return;
 
@@ -1316,23 +1405,54 @@
     }
 
     async function sendWriteVar(v, valStr) {
-      const val = parseFloat(valStr);
-      if (Number.isNaN(val)) {
+      const userVal = parseFloat(valStr);
+      if (Number.isNaN(userVal)) {
         alert(`Enter a numeric value for ${v.name}`);
         return;
       }
+
       const endianness = v.endianness || "lsbFirst";
-      const dataBytes = encodeValueBytes(v, val, endianness);
+
+      // Decide what numeric value to encode:
+      //  - If writeFormula exists, compute raw = writeFormula(V) and encode with scale=1.
+      //  - Otherwise, encode userVal using v.format + v.scale as before.
+      let dataBytes;
+
+      if (v.writeFormula) {
+        // 1) writeFormula has highest priority
+        const raw = evaluateWriteFormula(v.writeFormula, userVal);
+        if (raw === null || raw === undefined) {
+          alert(`writeFormula evaluation failed for ${v.name}`);
+          return;
+        }
+        const vEnc = { ...v, scale: 1 };
+        dataBytes = encodeValueBytes(vEnc, raw, endianness);
+      } else if (v.lut && Array.isArray(v.lut.points)) {
+        // 2) LUT: engineering value -> raw ADC
+        const raw = lutEngToRaw(v.lut, userVal);
+        if (raw === null || raw === undefined) {
+          alert(`LUT conversion failed for ${v.name}`);
+          return;
+        }
+        const vEnc = { ...v, scale: 1 };
+        dataBytes = encodeValueBytes(vEnc, raw, endianness);
+      } else {
+        // 3) Normal scaling (format + scale)
+        dataBytes = encodeValueBytes(v, userVal, endianness);
+      }
+
+
       const payload = [v.id, ...dataBytes];
       await sendFrame(buildFrame(CMD_WRITE_VAR, payload));
 
-      applyDecodedValue("WRITE", v.id, val);
+      // For UI/logging, we keep the engineering value (what user typed)
+      applyDecodedValue("WRITE", v.id, userVal);
 
       const time = new Date().toISOString();
       const values = {};
       values[String(v.id)] = {
         name: v.name,
-        value: val,
+        value: userVal,
         unit: v.unit || ""
       };
       readWriteLog.push({
